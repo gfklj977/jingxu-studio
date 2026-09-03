@@ -110,3 +110,11 @@ export async function saveProjectScript(projectId: number, script: Pick<ProjectS
   if (!response.ok) throw new Error('脚本保存失败')
   return response.json() as Promise<ProjectScript>
 }
+
+export interface ProviderStatus { id: string; name: string; capability: string; status: 'MISSING' | 'READY' | 'ERROR' }
+
+export async function listProviders(): Promise<ProviderStatus[]> {
+  const response = await fetch('/api/settings/providers')
+  if (!response.ok) throw new Error('服务状态加载失败')
+  return ((await response.json()) as { data: ProviderStatus[] }).data
+}

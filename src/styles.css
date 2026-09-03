@@ -103,6 +103,12 @@ button { font: inherit; }
 .version-panel button small, .version-panel button span, .version-empty { color: #94a3b8; font-size: 12px; }
 .version-panel button span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 @media (max-width: 1050px) { .script-workspace { grid-template-columns: 1fr; } }
+.provider-error { margin-top: 14px; }
+.provider-list { display: grid; gap: 10px; margin-top: 18px; }
+.provider-list article { display: grid; grid-template-columns: 38px 1fr auto; align-items: center; gap: 12px; padding: 14px; border: 1px solid #e5e7eb; border-radius: 10px; }
+.provider-list article div { display: grid; gap: 3px; }
+.provider-list article small { color: #64748b; }
+.provider-icon { display: grid; place-items: center; width: 36px; height: 36px; border-radius: 9px; color: #0f766e; background: #f0fdfa; }
 .placeholder-view > span { color: #0f766e; font-size: 40px; }
 .placeholder-view h3 { margin: 16px 0 0; color: #0f172a; }
 .placeholder-view p { max-width: 480px; margin: 8px 0 20px; }

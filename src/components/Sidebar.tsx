@@ -24,9 +24,10 @@ interface SidebarProps {
   onOpenTrash: () => void
   onReorder: (sourceId: number, targetId: number) => void
   reorderEnabled: boolean
+  onOpenSettings: () => void
 }
 
-export function Sidebar({ projects, selectedId, onSelect, onCreate, searchValue, onSearchChange, onRename, onTogglePin, onTrash, onOpenTrash, onReorder, reorderEnabled }: SidebarProps) {
+export function Sidebar({ projects, selectedId, onSelect, onCreate, searchValue, onSearchChange, onRename, onTogglePin, onTrash, onOpenTrash, onReorder, reorderEnabled, onOpenSettings }: SidebarProps) {
   return (
     <aside className="sidebar" aria-label="项目侧栏">
       <header className="brand">
@@ -83,7 +84,7 @@ export function Sidebar({ projects, selectedId, onSelect, onCreate, searchValue,
       </section>
 
       <footer className="sidebar-footer">
-        <div><Tooltip title="全局设置"><Button type="text" icon={<SettingOutlined />}>设置</Button></Tooltip><Button type="text" icon={<DeleteOutlined />} onClick={onOpenTrash}>回收站</Button></div>
+        <div><Tooltip title="全局设置"><Button type="text" aria-label="AI 服务设置" icon={<SettingOutlined />} onClick={onOpenSettings}>设置</Button></Tooltip><Button type="text" icon={<DeleteOutlined />} onClick={onOpenTrash}>回收站</Button></div>
         <span className="local-badge"><i />本地运行</span>
       </footer>
     </aside>

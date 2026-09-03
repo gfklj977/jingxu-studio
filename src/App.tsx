@@ -4,6 +4,7 @@ import { createProject, listProjects, listTrashedProjects, reorderProjects, rest
 import { CreateProjectDialog } from './components/CreateProjectDialog'
 import { DeleteProjectDialog, RecycleBin, RenameProjectDialog } from './components/ProjectDialogs'
 import { Sidebar } from './components/Sidebar'
+import { ProviderSettings } from './components/ProviderSettings'
 import { Workspace } from './components/Workspace'
 import { projects } from './data'
 import type { Stage } from './types'
@@ -21,6 +22,7 @@ export default function App() {
   const [trashOpen, setTrashOpen] = useState(false)
   const [trashItems, setTrashItems] = useState<Project[]>([])
   const [trashLoading, setTrashLoading] = useState(false)
+  const [settingsOpen, setSettingsOpen] = useState(false)
   const project = projectItems.find((item) => item.id === selectedId) ?? projectItems[0]
   const normalizedSearch = searchValue.trim().toLocaleLowerCase('zh-CN')
   const visibleProjects = normalizedSearch
@@ -105,13 +107,14 @@ export default function App() {
     <ConfigProvider theme={{ token: { colorPrimary: '#0f766e', colorInfo: '#0f766e', borderRadius: 8, fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", sans-serif' } }}>
       <AntApp>
         <div className="app-shell">
-          <Sidebar projects={visibleProjects} selectedId={selectedId} onSelect={setSelectedId} onCreate={() => setDialogOpen(true)} searchValue={searchValue} onSearchChange={setSearchValue} onRename={setEditingProject} onTogglePin={handleTogglePin} onTrash={setDeletingProject} onOpenTrash={openTrash} onReorder={handleReorder} reorderEnabled={!normalizedSearch} />
+          <Sidebar projects={visibleProjects} selectedId={selectedId} onSelect={setSelectedId} onCreate={() => setDialogOpen(true)} searchValue={searchValue} onSearchChange={setSearchValue} onRename={setEditingProject} onTogglePin={handleTogglePin} onTrash={setDeletingProject} onOpenTrash={openTrash} onReorder={handleReorder} reorderEnabled={!normalizedSearch} onOpenSettings={() => setSettingsOpen(true)} />
           <Workspace project={project} stage={stage} onStageChange={setStage} />
         </div>
         <CreateProjectDialog open={dialogOpen} submitting={submitting} onCancel={() => setDialogOpen(false)} onCreate={handleCreate} />
         <RenameProjectDialog project={editingProject} onCancel={() => setEditingProject(null)} onRename={handleRename} />
         <DeleteProjectDialog project={deletingProject} onCancel={() => setDeletingProject(null)} onConfirm={handleTrash} />
         <RecycleBin open={trashOpen} projects={trashItems} loading={trashLoading} onClose={() => setTrashOpen(false)} onRestore={handleRestore} />
+        <ProviderSettings open={settingsOpen} onClose={() => setSettingsOpen(false)} />
       </AntApp>
     </ConfigProvider>
   )

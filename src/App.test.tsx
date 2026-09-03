@@ -153,4 +153,18 @@ describe('镜序工坊工作台', () => {
     expect(fetchMock).toHaveBeenLastCalledWith('/api/projects/181/script', expect.objectContaining({ method: 'PUT' }))
     expect(await screen.findByText('版本 1')).toBeInTheDocument()
   })
+
+  it('在设置中展示服务配置状态', async () => {
+    const user = userEvent.setup()
+    const fetchMock = vi.mocked(fetch)
+    fetchMock
+      .mockResolvedValueOnce({ ok: true, json: async () => ({ data: [], pagination: {} }) } as Response)
+      .mockResolvedValueOnce({ ok: true, json: async () => ({ data: [{ id: 'deepseek', name: 'DeepSeek', capability: '文本生成', status: 'MISSING' }] }) } as Response)
+    render(<App />)
+
+    await user.click(screen.getByRole('button', { name: 'AI 服务设置' }))
+
+    expect(await screen.findByText('DeepSeek')).toBeInTheDocument()
+    expect(screen.getByText('未配置')).toBeInTheDocument()
+  })
 })
