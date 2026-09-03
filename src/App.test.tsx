@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react'
+import { fireEvent, render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import App from './App'
@@ -108,5 +108,25 @@ describe('镜序工坊工作台', () => {
     await user.click(await screen.findByRole('button', { name: '恢复：被删除项目' }))
 
     expect(await screen.findByRole('button', { name: /被删除项目，草稿/ })).toBeInTheDocument()
+  })
+
+  it('拖动项目后保存新顺序', async () => {
+    const fetchMock = vi.mocked(fetch)
+    render(<App />)
+    const dataTransfer = {
+      value: '',
+      setData(_type: string, value: string) { this.value = value },
+      getData() { return this.value },
+    }
+
+    const source = screen.getByRole('button', { name: '摄影师如何看待 AI 时代，已完成' }).closest('.project-row')!
+    const target = screen.getByRole('button', { name: 'AI 如何重塑摄影门店，制作中' }).closest('.project-row')!
+    fireEvent.dragStart(source, { dataTransfer })
+    fireEvent.drop(target, { dataTransfer })
+
+    expect(fetchMock).toHaveBeenLastCalledWith('/api/projects/order', expect.objectContaining({
+      method: 'PUT',
+      body: JSON.stringify({ projectIds: [180, 181, 179] }),
+    }))
   })
 })

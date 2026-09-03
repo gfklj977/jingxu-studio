@@ -24,6 +24,8 @@ button { font: inherit; }
 .project-list { display: grid; gap: 4px; }
 .project-empty { margin: 18px 8px; color: #94a3b8; font-size: 12px; text-align: center; }
 .project-row { display: grid; grid-template-columns: minmax(0,1fr) 28px; align-items: center; border-radius: 8px; }
+.project-row[draggable="true"] { cursor: grab; }
+.project-row[draggable="true"]:active { cursor: grabbing; opacity: .72; }
 .project-row.selected { color: #0f766e; background: #e9f7f4; }
 .project-item { display: flex; align-items: center; gap: 10px; min-width: 0; padding: 10px; border-radius: 8px; background: transparent; color: #334155; }
 .project-row:hover { background: #f8fafc; }

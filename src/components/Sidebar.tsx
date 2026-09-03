@@ -22,9 +22,11 @@ interface SidebarProps {
   onTogglePin: (project: Project) => void
   onTrash: (project: Project) => void
   onOpenTrash: () => void
+  onReorder: (sourceId: number, targetId: number) => void
+  reorderEnabled: boolean
 }
 
-export function Sidebar({ projects, selectedId, onSelect, onCreate, searchValue, onSearchChange, onRename, onTogglePin, onTrash, onOpenTrash }: SidebarProps) {
+export function Sidebar({ projects, selectedId, onSelect, onCreate, searchValue, onSearchChange, onRename, onTogglePin, onTrash, onOpenTrash, onReorder, reorderEnabled }: SidebarProps) {
   return (
     <aside className="sidebar" aria-label="项目侧栏">
       <header className="brand">
@@ -55,7 +57,15 @@ export function Sidebar({ projects, selectedId, onSelect, onCreate, searchValue,
       <section className="project-block" aria-labelledby="project-title">
         <div className="section-label" id="project-title"><span>最近项目</span><small>{projects.length}</small></div>
         <div className="project-list">
-          {projects.map((project) => <div className={`project-row ${project.id === selectedId ? 'selected' : ''}`} key={project.id}>
+          {projects.map((project) => <div className={`project-row ${project.id === selectedId ? 'selected' : ''}`} key={project.id}
+            draggable={reorderEnabled}
+            onDragStart={(event) => event.dataTransfer.setData('text/project-id', String(project.id))}
+            onDragOver={(event) => { if (reorderEnabled) event.preventDefault() }}
+            onDrop={(event) => {
+              event.preventDefault()
+              const sourceId = Number(event.dataTransfer.getData('text/project-id'))
+              if (sourceId && sourceId !== project.id) onReorder(sourceId, project.id)
+            }}>
             <button className="project-item" aria-pressed={project.id === selectedId} aria-label={`${project.title}，${project.status}`} onClick={() => onSelect(project.id)}>
               <span className="project-icon"><FolderOpenOutlined /></span>
               <span className="project-copy"><strong>{project.title}</strong><small>{project.updatedAt} · {project.status}</small></span>

@@ -1,6 +1,6 @@
 import { App as AntApp, ConfigProvider } from 'antd'
 import { useEffect, useState } from 'react'
-import { createProject, listProjects, listTrashedProjects, restoreProject, trashProject, updateProject } from './api/projects'
+import { createProject, listProjects, listTrashedProjects, reorderProjects, restoreProject, trashProject, updateProject } from './api/projects'
 import { CreateProjectDialog } from './components/CreateProjectDialog'
 import { DeleteProjectDialog, RecycleBin, RenameProjectDialog } from './components/ProjectDialogs'
 import { Sidebar } from './components/Sidebar'
@@ -85,11 +85,27 @@ export default function App() {
     setProjectItems((current) => [restored, ...current])
   }
 
+  async function handleReorder(sourceId: number, targetId: number) {
+    const previous = projectItems
+    const sourceIndex = previous.findIndex((item) => item.id === sourceId)
+    const targetIndex = previous.findIndex((item) => item.id === targetId)
+    if (sourceIndex < 0 || targetIndex < 0) return
+    const next = [...previous]
+    const [moved] = next.splice(sourceIndex, 1)
+    next.splice(targetIndex, 0, moved)
+    setProjectItems(next)
+    try {
+      await reorderProjects(next.map((item) => item.id))
+    } catch {
+      setProjectItems(previous)
+    }
+  }
+
   return (
     <ConfigProvider theme={{ token: { colorPrimary: '#0f766e', colorInfo: '#0f766e', borderRadius: 8, fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", sans-serif' } }}>
       <AntApp>
         <div className="app-shell">
-          <Sidebar projects={visibleProjects} selectedId={selectedId} onSelect={setSelectedId} onCreate={() => setDialogOpen(true)} searchValue={searchValue} onSearchChange={setSearchValue} onRename={setEditingProject} onTogglePin={handleTogglePin} onTrash={setDeletingProject} onOpenTrash={openTrash} />
+          <Sidebar projects={visibleProjects} selectedId={selectedId} onSelect={setSelectedId} onCreate={() => setDialogOpen(true)} searchValue={searchValue} onSearchChange={setSearchValue} onRename={setEditingProject} onTogglePin={handleTogglePin} onTrash={setDeletingProject} onOpenTrash={openTrash} onReorder={handleReorder} reorderEnabled={!normalizedSearch} />
           <Workspace project={project} stage={stage} onStageChange={setStage} />
         </div>
         <CreateProjectDialog open={dialogOpen} submitting={submitting} onCancel={() => setDialogOpen(false)} onCreate={handleCreate} />

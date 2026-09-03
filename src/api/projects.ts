@@ -75,3 +75,12 @@ export async function restoreProject(id: number): Promise<Project> {
   if (!response.ok) throw new Error('项目恢复失败')
   return toProject(await response.json() as ApiProject)
 }
+
+export async function reorderProjects(projectIds: number[]): Promise<void> {
+  const response = await fetch('/api/projects/order', {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ projectIds }),
+  })
+  if (!response.ok) throw new Error('项目排序保存失败')
+}
