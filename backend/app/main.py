@@ -1,20 +1,36 @@
 import math
 from contextlib import asynccontextmanager
 from pathlib import Path
+from typing import Optional
 
-from fastapi import FastAPI, Query, Request
+from fastapi import FastAPI, HTTPException, Query, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 
 from .database import InvalidProjectOrder, ProjectNotFound, ProjectRepository
-from .schemas import CreateProject, PaginatedResponse, Pagination, Project, ProjectOrder, ProjectScript, ProviderCatalog, ProviderStatus, SaveScript, UpdateProject
+from .schemas import CreateProject, PaginatedResponse, Pagination, Project, ProjectOrder, ProjectScript, ProviderCatalog, ProviderSecret, ProviderStatus, SaveScript, UpdateProject
+from .secrets import KeyringSecretStore, SecretStore
 
 
 DEFAULT_DATA_PATH = Path.home() / "Library" / "Application Support" / "JingxuStudio" / "data" / "app.db"
 
 
-def create_app(database_path: Path = DEFAULT_DATA_PATH) -> FastAPI:
+PROVIDERS = [
+    ("deepseek", "DeepSeek", "文本生成"),
+    ("doubao_search", "豆包搜索", "联网搜索"),
+    ("tavily", "Tavily", "联网搜索"),
+    ("seedream", "火山方舟 Seedream", "图像生成"),
+    ("apiyi", "API易 GPT-Image-2", "图像生成"),
+    ("shengsuanyun", "胜算云 GPT-Image-2", "图像生成"),
+    ("doubao_tts", "豆包 TTS", "语音合成"),
+    ("doubao_asr", "豆包 ASR", "语音识别"),
+]
+PROVIDER_IDS = {item[0] for item in PROVIDERS}
+
+
+def create_app(database_path: Path = DEFAULT_DATA_PATH, secret_store: Optional[SecretStore] = None) -> FastAPI:
     repository = ProjectRepository(Path(database_path))
+    secrets = secret_store or KeyringSecretStore()
 
     @asynccontextmanager
     async def lifespan(_: FastAPI):
@@ -130,17 +146,19 @@ def create_app(database_path: Path = DEFAULT_DATA_PATH) -> FastAPI:
 
     @app.get("/api/settings/providers", response_model=ProviderCatalog)
     def list_providers():
-        configured = [
-            ("deepseek", "DeepSeek", "文本生成"),
-            ("doubao_search", "豆包搜索", "联网搜索"),
-            ("tavily", "Tavily", "联网搜索"),
-            ("seedream", "火山方舟 Seedream", "图像生成"),
-            ("apiyi", "API易 GPT-Image-2", "图像生成"),
-            ("shengsuanyun", "胜算云 GPT-Image-2", "图像生成"),
-            ("doubao_tts", "豆包 TTS", "语音合成"),
-            ("doubao_asr", "豆包 ASR", "语音识别"),
-        ]
-        return ProviderCatalog(data=[ProviderStatus(id=id_, name=name, capability=capability, status="MISSING") for id_, name, capability in configured])
+        return ProviderCatalog(data=[ProviderStatus(id=id_, name=name, capability=capability, status="READY" if secrets.get(id_) else "MISSING") for id_, name, capability in PROVIDERS])
+
+    @app.put("/api/settings/providers/{provider_id}/secret", status_code=204)
+    def save_provider_secret(provider_id: str, payload: ProviderSecret):
+        if provider_id not in PROVIDER_IDS:
+            raise HTTPException(status_code=404, detail="服务不存在")
+        secrets.set(provider_id, payload.apiKey.get_secret_value())
+
+    @app.delete("/api/settings/providers/{provider_id}/secret", status_code=204)
+    def delete_provider_secret(provider_id: str):
+        if provider_id not in PROVIDER_IDS:
+            raise HTTPException(status_code=404, detail="服务不存在")
+        secrets.delete(provider_id)
 
     return app
 

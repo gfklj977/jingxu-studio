@@ -3,8 +3,22 @@ from fastapi.testclient import TestClient
 from app.main import create_app
 
 
-def make_client(tmp_path):
-    app = create_app(tmp_path / "jingxu-test.db")
+class FakeSecretStore:
+    def __init__(self):
+        self.values = {}
+
+    def get(self, provider_id):
+        return self.values.get(provider_id)
+
+    def set(self, provider_id, value):
+        self.values[provider_id] = value
+
+    def delete(self, provider_id):
+        self.values.pop(provider_id, None)
+
+
+def make_client(tmp_path, secret_store=None):
+    app = create_app(tmp_path / "jingxu-test.db", secret_store=secret_store or FakeSecretStore())
     return TestClient(app)
 
 
@@ -192,3 +206,27 @@ def test_provider_catalog_reports_reference_services_as_unconfigured(tmp_path):
     }
     assert all(item["status"] == "MISSING" for item in providers)
     assert all("apiKey" not in item for item in providers)
+
+
+def test_provider_secret_can_be_saved_and_removed_without_being_returned(tmp_path):
+    store = FakeSecretStore()
+    with make_client(tmp_path, store) as client:
+        saved = client.put("/api/settings/providers/deepseek/secret", json={"apiKey": "sk-test-safe-value"})
+        configured = client.get("/api/settings/providers").json()["data"]
+        removed = client.delete("/api/settings/providers/deepseek/secret")
+        after_removal = client.get("/api/settings/providers").json()["data"]
+
+    assert saved.status_code == 204
+    assert next(item for item in configured if item["id"] == "deepseek")["status"] == "READY"
+    assert all("apiKey" not in item for item in configured)
+    assert removed.status_code == 204
+    assert next(item for item in after_removal if item["id"] == "deepseek")["status"] == "MISSING"
+
+
+def test_provider_secret_rejects_unknown_provider_and_invalid_key(tmp_path):
+    with make_client(tmp_path) as client:
+        unknown = client.put("/api/settings/providers/unknown/secret", json={"apiKey": "valid-looking-key"})
+        short = client.put("/api/settings/providers/deepseek/secret", json={"apiKey": "short"})
+
+    assert unknown.status_code == 404
+    assert short.status_code == 422

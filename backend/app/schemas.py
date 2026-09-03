@@ -2,7 +2,7 @@ from datetime import datetime
 from enum import Enum
 from typing import Generic, List, Optional, TypeVar
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, SecretStr, field_validator
 
 
 class ProjectStatus(str, Enum):
@@ -90,6 +90,10 @@ class ProviderStatus(BaseModel):
 
 class ProviderCatalog(BaseModel):
     data: List[ProviderStatus]
+
+
+class ProviderSecret(BaseModel):
+    apiKey: SecretStr = Field(min_length=8, max_length=500)
 
 
 class Pagination(BaseModel):
