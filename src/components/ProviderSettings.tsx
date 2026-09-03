@@ -1,7 +1,7 @@
 import { ApiOutlined, LockOutlined } from '@ant-design/icons'
 import { Alert, Button, Drawer, Input, Popconfirm, Skeleton, Tag, message } from 'antd'
 import { useEffect, useState } from 'react'
-import { deleteProviderSecret, listProviders, saveProviderSecret, type ProviderStatus } from '../api/projects'
+import { deleteProviderSecret, listProviders, saveProviderSecret, testProvider, type ProviderStatus } from '../api/projects'
 
 export function ProviderSettings({ open, onClose }: { open: boolean; onClose: () => void }) {
   const [providers, setProviders] = useState<ProviderStatus[]>([])
@@ -9,6 +9,8 @@ export function ProviderSettings({ open, onClose }: { open: boolean; onClose: ()
   const [error, setError] = useState('')
   const [editingId, setEditingId] = useState('')
   const [secret, setSecret] = useState('')
+  const [testingId, setTestingId] = useState('')
+  const [latencies, setLatencies] = useState<Record<string, number>>({})
 
   async function reload() {
     setProviders(await listProviders())
@@ -32,6 +34,15 @@ export function ProviderSettings({ open, onClose }: { open: boolean; onClose: ()
     } catch { setError('密钥删除失败') }
   }
 
+  async function check(provider: ProviderStatus) {
+    setTestingId(provider.id)
+    try {
+      const result = await testProvider(provider.id)
+      setLatencies((current) => ({ ...current, [provider.id]: result.latencyMs }))
+    } catch { setError(`${provider.name} 连接失败，请检查密钥和网络`) }
+    finally { setTestingId('') }
+  }
+
   useEffect(() => {
     if (!open) return
     listProviders().then(setProviders).catch(() => setError('服务状态加载失败')).finally(() => setLoading(false))
@@ -44,7 +55,7 @@ export function ProviderSettings({ open, onClose }: { open: boolean; onClose: ()
       {providers.map((provider) => <article key={provider.id} className={editingId === provider.id ? 'editing' : ''}>
         <span className="provider-icon"><ApiOutlined /></span>
         <div><strong>{provider.name}</strong><small>{provider.capability}</small></div>
-        <div className="provider-actions"><Tag color={provider.status === 'READY' ? 'success' : provider.status === 'ERROR' ? 'error' : 'default'}>{provider.status === 'READY' ? '已就绪' : provider.status === 'ERROR' ? '连接失败' : '未配置'}</Tag><Button size="small" aria-label={`配置 ${provider.name}`} onClick={() => { setEditingId(provider.id); setSecret('') }}>配置</Button></div>
+        <div className="provider-actions"><Tag color={provider.status === 'READY' ? 'success' : provider.status === 'ERROR' ? 'error' : 'default'}>{provider.status === 'READY' ? '已就绪' : provider.status === 'ERROR' ? '连接失败' : '未配置'}</Tag>{latencies[provider.id] !== undefined && <small>{latencies[provider.id]} ms</small>}{provider.status === 'READY' && ['deepseek', 'tavily'].includes(provider.id) && <Button size="small" aria-label={`测试 ${provider.name} 连接`} loading={testingId === provider.id} onClick={() => check(provider)}>测试</Button>}<Button size="small" aria-label={`配置 ${provider.name}`} onClick={() => { setEditingId(provider.id); setSecret('') }}>配置</Button></div>
         {editingId === provider.id && <div className="provider-editor"><Input.Password autoComplete="new-password" aria-label={`${provider.name} API 密钥`} value={secret} onChange={(event) => setSecret(event.target.value)} placeholder="输入 API 密钥" /><Button type="primary" aria-label={`保存 ${provider.name} 密钥`} disabled={secret.length < 8} onClick={() => save(provider)}>安全保存</Button>{provider.status === 'READY' && <Popconfirm title="删除已保存的密钥？" onConfirm={() => remove(provider)}><Button danger>删除密钥</Button></Popconfirm>}</div>}
       </article>)}
     </div>}

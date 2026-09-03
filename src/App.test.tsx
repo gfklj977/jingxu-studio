@@ -186,4 +186,20 @@ describe('镜序工坊工作台', () => {
     expect(fetchMock).toHaveBeenLastCalledWith('/api/settings/providers')
     expect(await screen.findByText('已就绪')).toBeInTheDocument()
   })
+
+  it('对已配置的 DeepSeek 执行连接检测', async () => {
+    const user = userEvent.setup()
+    const fetchMock = vi.mocked(fetch)
+    fetchMock
+      .mockResolvedValueOnce({ ok: true, json: async () => ({ data: [], pagination: {} }) } as Response)
+      .mockResolvedValueOnce({ ok: true, json: async () => ({ data: [{ id: 'deepseek', name: 'DeepSeek', capability: '文本生成', status: 'READY' }] }) } as Response)
+      .mockResolvedValueOnce({ ok: true, json: async () => ({ status: 'VALID', latencyMs: 42 }) } as Response)
+    render(<App />)
+
+    await user.click(screen.getByRole('button', { name: 'AI 服务设置' }))
+    await user.click(await screen.findByRole('button', { name: '测试 DeepSeek 连接' }))
+
+    expect(fetchMock).toHaveBeenLastCalledWith('/api/settings/providers/deepseek/test', { method: 'POST' })
+    expect(await screen.findByText('42 ms')).toBeInTheDocument()
+  })
 })
