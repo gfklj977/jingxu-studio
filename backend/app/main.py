@@ -4,12 +4,13 @@ from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Optional
 
-from fastapi import FastAPI, HTTPException, Query, Request
+from fastapi import BackgroundTasks, FastAPI, HTTPException, Query, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 
 from .database import ActiveProductionJob, InvalidProjectOrder, ProjectNotFound, ProjectRepository
 from .providers import HttpProviderTester, ProviderTester
+from .production import PreflightProductionExecutor, ProductionExecutor
 from .schemas import CreateProject, GeneratedScript, GenerateScriptRequest, PaginatedResponse, Pagination, ProductionJob, ProductionSettings, Project, ProjectOrder, ProjectScript, ProviderCatalog, ProviderSecret, ProviderStatus, ProviderTestResult, ResearchItem, ResearchRequest, ResearchResult, SaveScript, UpdateProject
 from .secrets import KeyringSecretStore, SecretStore
 
@@ -30,10 +31,11 @@ PROVIDERS = [
 PROVIDER_IDS = {item[0] for item in PROVIDERS}
 
 
-def create_app(database_path: Path = DEFAULT_DATA_PATH, secret_store: Optional[SecretStore] = None, provider_tester: Optional[ProviderTester] = None) -> FastAPI:
+def create_app(database_path: Path = DEFAULT_DATA_PATH, secret_store: Optional[SecretStore] = None, provider_tester: Optional[ProviderTester] = None, production_executor: Optional[ProductionExecutor] = None) -> FastAPI:
     repository = ProjectRepository(Path(database_path))
     secrets = secret_store or KeyringSecretStore()
     tester = provider_tester or HttpProviderTester()
+    executor = production_executor or PreflightProductionExecutor()
 
     @asynccontextmanager
     async def lifespan(_: FastAPI):
@@ -212,8 +214,10 @@ def create_app(database_path: Path = DEFAULT_DATA_PATH, secret_store: Optional[S
         return repository.save_production_settings(project_id, payload)
 
     @app.post("/api/projects/{project_id}/production-jobs", response_model=ProductionJob, status_code=201)
-    def create_production_job(project_id: int):
-        return repository.create_production_job(project_id)
+    def create_production_job(project_id: int, background_tasks: BackgroundTasks):
+        job = repository.create_production_job(project_id)
+        background_tasks.add_task(executor.execute, repository, job.id, secrets)
+        return job
 
     @app.get("/api/projects/{project_id}/production-jobs/latest", response_model=ProductionJob)
     def latest_production_job(project_id: int):

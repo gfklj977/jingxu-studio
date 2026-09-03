@@ -154,6 +154,7 @@ class ProductionJob(BaseModel):
     projectId: int
     status: str
     stages: List[ProductionJobStage]
+    logs: List[str] = []
     createdAt: datetime
     updatedAt: datetime
 

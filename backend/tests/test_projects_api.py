@@ -1,6 +1,7 @@
 from fastapi.testclient import TestClient
 
 from app.main import create_app
+from app.production import NoopProductionExecutor, PreflightProductionExecutor
 
 
 class FakeSecretStore:
@@ -32,8 +33,8 @@ class FakeProviderTester:
         return f"生成脚本：{topic}\n{brief}\n{research_notes}"
 
 
-def make_client(tmp_path, secret_store=None, provider_tester=None):
-    app = create_app(tmp_path / "jingxu-test.db", secret_store=secret_store or FakeSecretStore(), provider_tester=provider_tester or FakeProviderTester())
+def make_client(tmp_path, secret_store=None, provider_tester=None, production_executor=None):
+    app = create_app(tmp_path / "jingxu-test.db", secret_store=secret_store or FakeSecretStore(), provider_tester=provider_tester or FakeProviderTester(), production_executor=production_executor or NoopProductionExecutor())
     return TestClient(app)
 
 
@@ -322,3 +323,15 @@ def test_create_get_and_cancel_production_job(tmp_path):
     assert duplicate.status_code == 409
     assert cancelled.json()["status"] == "CANCELLED"
     assert loaded.json()["id"] == created.json()["id"]
+
+
+def test_production_preflight_fails_with_actionable_log_when_script_is_empty(tmp_path):
+    with make_client(tmp_path, production_executor=PreflightProductionExecutor()) as client:
+        project = client.post("/api/projects", json={"title": "待生产", "channel": "默认栏目"}).json()
+        created = client.post(f"/api/projects/{project['id']}/production-jobs")
+        loaded = client.get(f"/api/projects/{project['id']}/production-jobs/latest")
+
+    assert created.status_code == 201
+    assert loaded.json()["status"] == "FAILED"
+    assert loaded.json()["stages"][0]["status"] == "FAILED"
+    assert loaded.json()["logs"] == ["开始生产前检查", "前置检查失败：请先完成并保存脚本"]

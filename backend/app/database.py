@@ -39,7 +39,10 @@ class ProjectRepository:
                 """
             )
             connection.execute("CREATE TABLE IF NOT EXISTS production_settings (project_id INTEGER PRIMARY KEY, payload TEXT NOT NULL, updated_at TEXT NOT NULL, FOREIGN KEY(project_id) REFERENCES projects(id))")
-            connection.execute("CREATE TABLE IF NOT EXISTS production_jobs (id INTEGER PRIMARY KEY AUTOINCREMENT, project_id INTEGER NOT NULL, status TEXT NOT NULL, stages TEXT NOT NULL, created_at TEXT NOT NULL, updated_at TEXT NOT NULL, FOREIGN KEY(project_id) REFERENCES projects(id))")
+            connection.execute("CREATE TABLE IF NOT EXISTS production_jobs (id INTEGER PRIMARY KEY AUTOINCREMENT, project_id INTEGER NOT NULL, status TEXT NOT NULL, stages TEXT NOT NULL, logs TEXT NOT NULL DEFAULT '[]', created_at TEXT NOT NULL, updated_at TEXT NOT NULL, FOREIGN KEY(project_id) REFERENCES projects(id))")
+            job_columns = {row[1] for row in connection.execute("PRAGMA table_info(production_jobs)")}
+            if "logs" not in job_columns:
+                connection.execute("ALTER TABLE production_jobs ADD COLUMN logs TEXT NOT NULL DEFAULT '[]'")
             columns = {row[1] for row in connection.execute("PRAGMA table_info(projects)")}
             migrations = {
                 "is_pinned": "ALTER TABLE projects ADD COLUMN is_pinned INTEGER NOT NULL DEFAULT 0",
@@ -262,7 +265,20 @@ class ProjectRepository:
             row = connection.execute("SELECT * FROM production_jobs WHERE id = ?", (job_id,)).fetchone()
         if row is None:
             raise ProjectNotFound()
-        return ProductionJob(id=row["id"], projectId=row["project_id"], status=row["status"], stages=[ProductionJobStage(**item) for item in json.loads(row["stages"])], createdAt=datetime.fromisoformat(row["created_at"]), updatedAt=datetime.fromisoformat(row["updated_at"]))
+        return ProductionJob(id=row["id"], projectId=row["project_id"], status=row["status"], stages=[ProductionJobStage(**item) for item in json.loads(row["stages"])], logs=json.loads(row["logs"]), createdAt=datetime.fromisoformat(row["created_at"]), updatedAt=datetime.fromisoformat(row["updated_at"]))
+
+    def update_production_job(self, job_id: int, *, status: str, log: str, failed_stage: Optional[str] = None) -> ProductionJob:
+        job = self.get_production_job(job_id)
+        stages = [stage.model_dump(mode="json") for stage in job.stages]
+        if failed_stage:
+            for stage in stages:
+                if stage["name"] == failed_stage:
+                    stage["status"] = "FAILED"
+        logs = [*job.logs, log]
+        now = datetime.now(timezone.utc).isoformat()
+        with self._connect() as connection:
+            connection.execute("UPDATE production_jobs SET status = ?, stages = ?, logs = ?, updated_at = ? WHERE id = ?", (status, json.dumps(stages), json.dumps(logs, ensure_ascii=False), now, job_id))
+        return self.get_production_job(job_id)
 
     def latest_production_job(self, project_id: int) -> ProductionJob:
         self.get(project_id)
