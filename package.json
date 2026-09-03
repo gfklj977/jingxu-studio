@@ -20,7 +20,8 @@
     "release:check": "node scripts/release-check.cjs",
     "release:checksums": "node scripts/checksum-release.cjs",
     "release:verify": "node scripts/verify-release.cjs",
-    "test:release": "node --test scripts/verify-release.node-test.cjs"
+    "release:smoke": "node scripts/smoke-packaged-backend.cjs",
+    "test:release": "node --test scripts/verify-release.node-test.cjs scripts/smoke-packaged-backend.node-test.cjs"
   },
   "dependencies": {
     "@ant-design/icons": "^6.1.0",
