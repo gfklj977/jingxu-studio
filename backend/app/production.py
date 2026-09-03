@@ -36,11 +36,42 @@ class HttpDoubaoTtsSynthesizer:
         return base64.b64decode(payload["data"])
 
 
+class AsrRecognizer(Protocol):
+    def recognize(self, *, app_id: str, access_token: str, audio: bytes) -> list[dict]: ...
+
+
+class HttpDoubaoAsrRecognizer:
+    def recognize(self, *, app_id: str, access_token: str, audio: bytes) -> list[dict]:
+        response = httpx.post(
+            "https://openspeech.bytedance.com/api/v3/auc/bigmodel/recognize/flash",
+            headers={"X-Api-App-Key": app_id, "X-Api-Access-Key": access_token, "X-Api-Resource-Id": "volc.bigasr.auc_turbo", "X-Api-Request-Id": str(uuid.uuid4()), "X-Api-Sequence": "-1"},
+            json={"user": {"uid": app_id}, "audio": {"data": base64.b64encode(audio).decode("ascii")}, "request": {"model_name": "bigmodel"}},
+            timeout=120,
+        )
+        response.raise_for_status()
+        if response.headers.get("X-Api-Status-Code") != "20000000":
+            raise RuntimeError(response.headers.get("X-Api-Message") or "豆包 ASR 返回异常")
+        return response.json().get("result", {}).get("utterances", [])
+
+
+def _srt_timestamp(milliseconds: int) -> str:
+    hours, remainder = divmod(milliseconds, 3_600_000)
+    minutes, remainder = divmod(remainder, 60_000)
+    seconds, millis = divmod(remainder, 1_000)
+    return f"{hours:02}:{minutes:02}:{seconds:02},{millis:03}"
+
+
+def render_srt(utterances: list[dict]) -> str:
+    blocks = [f"{index}\n{_srt_timestamp(item['start_time'])} --> {_srt_timestamp(item['end_time'])}\n{item['text']}" for index, item in enumerate(utterances, 1)]
+    return "\n\n".join(blocks) + "\n"
+
+
 class PreflightProductionExecutor:
     REQUIRED_PROVIDERS = {"AUDIO": "doubao_tts", "SUBTITLES": "doubao_asr", "STORYBOARD": "seedream", "COVER": "seedream"}
 
-    def __init__(self, tts_synthesizer: Optional[TtsSynthesizer] = None):
+    def __init__(self, tts_synthesizer: Optional[TtsSynthesizer] = None, asr_recognizer: Optional[AsrRecognizer] = None):
         self.tts_synthesizer = tts_synthesizer or HttpDoubaoTtsSynthesizer()
+        self.asr_recognizer = asr_recognizer or HttpDoubaoAsrRecognizer()
 
     def execute(self, repository: ProjectRepository, job_id: int, secrets: SecretStore) -> None:
         job = repository.update_production_job(job_id, status="RUNNING", log="开始生产前检查")
@@ -68,6 +99,26 @@ class PreflightProductionExecutor:
                     repository.update_production_job(job_id, status="RUNNING", stage_name="AUDIO", stage_status="COMPLETED", progress=100, log=f"配音已保存：{output}")
                 except Exception as error:
                     repository.update_production_job(job_id, status="FAILED", failed_stage="AUDIO", log=f"配音生成失败：{error}")
+                    return
+            elif stage.name.value == "SUBTITLES":
+                audio_path = repository.database_path.parent / "projects" / str(job.projectId) / "audio" / "voice.mp3"
+                if not settings.asrAppId.strip():
+                    repository.update_production_job(job_id, status="FAILED", failed_stage="SUBTITLES", log="前置检查失败：请填写豆包 ASR AppID")
+                    return
+                if not audio_path.exists():
+                    repository.update_production_job(job_id, status="FAILED", failed_stage="SUBTITLES", log="字幕生成失败：缺少配音文件 voice.mp3")
+                    return
+                repository.update_production_job(job_id, status="RUNNING", stage_name="SUBTITLES", stage_status="RUNNING", progress=10, log="正在识别配音并生成字幕")
+                try:
+                    utterances = self.asr_recognizer.recognize(app_id=settings.asrAppId, access_token=secrets.get("doubao_asr") or "", audio=audio_path.read_bytes())
+                    if not utterances:
+                        raise RuntimeError("未识别到有效语音")
+                    output = repository.database_path.parent / "projects" / str(job.projectId) / "subtitles" / "captions.srt"
+                    output.parent.mkdir(parents=True, exist_ok=True)
+                    output.write_text(render_srt(utterances), encoding="utf-8")
+                    repository.update_production_job(job_id, status="RUNNING", stage_name="SUBTITLES", stage_status="COMPLETED", progress=100, log=f"字幕已保存：{output}")
+                except Exception as error:
+                    repository.update_production_job(job_id, status="FAILED", failed_stage="SUBTITLES", log=f"字幕生成失败：{error}")
                     return
             elif stage.name.value != "VIDEO":
                 repository.update_production_job(job_id, status="QUEUED", log=f"{stage.name.value} 等待媒体执行器")

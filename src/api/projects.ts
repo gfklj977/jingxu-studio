@@ -153,7 +153,7 @@ export async function generateProjectScript(projectId: number, input: { topic: s
 }
 
 export type ProductionStage = 'AUDIO' | 'SUBTITLES' | 'STORYBOARD' | 'COVER' | 'VIDEO'
-export interface ProductionSettings { stages: ProductionStage[]; resolution: string; fps: number; videoCodec: string; audioCodec: string; voiceVolume: number; bgmVolume: number; ttsAppId: string; ttsVoiceType: string }
+export interface ProductionSettings { stages: ProductionStage[]; resolution: string; fps: number; videoCodec: string; audioCodec: string; voiceVolume: number; bgmVolume: number; ttsAppId: string; ttsVoiceType: string; asrAppId: string }
 
 export async function getProductionSettings(projectId: number): Promise<ProductionSettings> {
   const response = await fetch(`/api/projects/${projectId}/production-settings`)

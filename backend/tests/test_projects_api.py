@@ -13,6 +13,17 @@ class FakeTtsSynthesizer:
         return b"fake mp3"
 
 
+class FakeAsrRecognizer:
+    def recognize(self, *, app_id, access_token, audio):
+        assert app_id == "asr-app"
+        assert access_token == "asr-token"
+        assert audio == b"existing mp3"
+        return [
+            {"start_time": 450, "end_time": 1530, "text": "第一句字幕。"},
+            {"start_time": 1700, "end_time": 3205, "text": "第二句字幕。"},
+        ]
+
+
 class FakeSecretStore:
     def __init__(self):
         self.values = {}
@@ -361,3 +372,23 @@ def test_audio_stage_generates_file_and_completes_before_next_stage(tmp_path):
     assert loaded.json()["stages"][0] == {"name": "AUDIO", "status": "COMPLETED", "progress": 100}
     audio_path = tmp_path / "projects" / str(project["id"]) / "audio" / "voice.mp3"
     assert audio_path.read_bytes() == b"fake mp3"
+
+
+def test_subtitle_stage_recognizes_audio_and_writes_srt(tmp_path):
+    secret_store = FakeSecretStore()
+    secret_store.set("doubao_asr", "asr-token")
+    executor = PreflightProductionExecutor(asr_recognizer=FakeAsrRecognizer())
+    with make_client(tmp_path, secret_store=secret_store, production_executor=executor) as client:
+        project = client.post("/api/projects", json={"title": "字幕任务", "channel": "默认栏目"}).json()
+        client.put(f"/api/projects/{project['id']}/script", json={"content": "测试脚本"})
+        audio_path = tmp_path / "projects" / str(project["id"]) / "audio" / "voice.mp3"
+        audio_path.parent.mkdir(parents=True)
+        audio_path.write_bytes(b"existing mp3")
+        client.put(f"/api/projects/{project['id']}/production-settings", json={"stages": ["SUBTITLES"], "asrAppId": "asr-app"})
+        client.post(f"/api/projects/{project['id']}/production-jobs")
+        loaded = client.get(f"/api/projects/{project['id']}/production-jobs/latest")
+
+    assert loaded.json()["status"] == "COMPLETED"
+    assert loaded.json()["stages"][0] == {"name": "SUBTITLES", "status": "COMPLETED", "progress": 100}
+    subtitle_path = tmp_path / "projects" / str(project["id"]) / "subtitles" / "captions.srt"
+    assert subtitle_path.read_text() == "1\n00:00:00,450 --> 00:00:01,530\n第一句字幕。\n\n2\n00:00:01,700 --> 00:00:03,205\n第二句字幕。\n"
