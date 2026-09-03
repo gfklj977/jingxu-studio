@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="960" height="240" viewBox="0 0 960 240" role="img" aria-labelledby="title desc">
+  <title id="title">镜序工坊横版 Logo</title>
+  <desc id="desc">镜序工坊图形标、中文名称、英文辅助名和产品描述</desc>
+  <g transform="translate(28 28) scale(.36)">
+    <rect width="512" height="512" rx="128" fill="#0F172A"/>
+    <rect x="92" y="108" width="260" height="220" rx="44" fill="none" stroke="#2DD4BF" stroke-width="24" opacity="0.48"/>
+    <rect x="128" y="144" width="260" height="220" rx="44" fill="none" stroke="#2DD4BF" stroke-width="24" opacity="0.74"/>
+    <rect x="164" y="180" width="260" height="220" rx="44" fill="#0F766E" stroke="#FFFFFF" stroke-width="20"/>
+    <path d="M258 238 L350 290 L258 342 Z" fill="#FFFFFF"/>
+    <path d="M105 396 H234" stroke="#FFFFFF" stroke-width="18" stroke-linecap="round"/>
+    <circle cx="105" cy="396" r="26" fill="#FF6B57"/>
+  </g>
+  <text x="250" y="105" fill="#0F172A" font-family="PingFang SC, Microsoft YaHei, Noto Sans CJK SC, sans-serif" font-size="62" font-weight="700" letter-spacing="4">镜序工坊</text>
+  <text x="254" y="145" fill="#0F766E" font-family="Inter, Segoe UI, sans-serif" font-size="18" font-weight="700" letter-spacing="5">JINGXU STUDIO</text>
+  <text x="254" y="184" fill="#64748B" font-family="PingFang SC, Microsoft YaHei, sans-serif" font-size="22">本地 AI 短片创作工作台</text>
+  <circle cx="825" cy="91" r="8" fill="#FF6B57"/>
+  <path d="M850 91 H914" stroke="#0F766E" stroke-width="8" stroke-linecap="round"/>
+</svg>
+
