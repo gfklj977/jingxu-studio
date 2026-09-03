@@ -13,9 +13,11 @@ interface SidebarProps {
   selectedId: number
   onSelect: (id: number) => void
   onCreate: () => void
+  searchValue: string
+  onSearchChange: (value: string) => void
 }
 
-export function Sidebar({ projects, selectedId, onSelect, onCreate }: SidebarProps) {
+export function Sidebar({ projects, selectedId, onSelect, onCreate, searchValue, onSearchChange }: SidebarProps) {
   return (
     <aside className="sidebar" aria-label="项目侧栏">
       <header className="brand">
@@ -30,7 +32,7 @@ export function Sidebar({ projects, selectedId, onSelect, onCreate }: SidebarPro
         新建创作项目
       </Button>
 
-      <Input prefix={<SearchOutlined />} placeholder="搜索项目" allowClear aria-label="搜索项目" />
+      <Input prefix={<SearchOutlined />} placeholder="搜索项目" allowClear aria-label="搜索项目" value={searchValue} onChange={(event) => onSearchChange(event.target.value)} />
 
       <section className="channel-block" aria-labelledby="channel-title">
         <div className="section-label" id="channel-title">
@@ -61,6 +63,7 @@ export function Sidebar({ projects, selectedId, onSelect, onCreate }: SidebarPro
               </span>
             </button>
           ))}
+          {projects.length === 0 && <p className="project-empty">没有匹配的项目</p>}
         </div>
       </section>
 

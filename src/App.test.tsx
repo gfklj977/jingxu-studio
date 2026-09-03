@@ -60,4 +60,14 @@ describe('镜序工坊工作台', () => {
     expect(await screen.findByRole('heading', { name: '新项目标题' })).toBeInTheDocument()
     expect(fetchMock).toHaveBeenLastCalledWith('/api/projects', expect.objectContaining({ method: 'POST' }))
   })
+
+  it('按项目标题或栏目筛选侧栏项目', async () => {
+    const user = userEvent.setup()
+    render(<App />)
+
+    await user.type(screen.getByRole('textbox', { name: '搜索项目' }), '儿童摄影')
+
+    expect(screen.getByRole('button', { name: /儿童摄影的情绪价值/ })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /AI 如何重塑摄影门店/ })).not.toBeInTheDocument()
+  })
 })

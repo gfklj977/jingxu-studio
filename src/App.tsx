@@ -11,9 +11,14 @@ export default function App() {
   const [projectItems, setProjectItems] = useState(projects)
   const [selectedId, setSelectedId] = useState(projects[0].id)
   const [stage, setStage] = useState<Stage>('成片')
+  const [searchValue, setSearchValue] = useState('')
   const [dialogOpen, setDialogOpen] = useState(false)
   const [submitting, setSubmitting] = useState(false)
   const project = projectItems.find((item) => item.id === selectedId) ?? projectItems[0]
+  const normalizedSearch = searchValue.trim().toLocaleLowerCase('zh-CN')
+  const visibleProjects = normalizedSearch
+    ? projectItems.filter((item) => `${item.title} ${item.channel}`.toLocaleLowerCase('zh-CN').includes(normalizedSearch))
+    : projectItems
 
   useEffect(() => {
     listProjects().then((loaded) => {
@@ -42,7 +47,7 @@ export default function App() {
     <ConfigProvider theme={{ token: { colorPrimary: '#0f766e', colorInfo: '#0f766e', borderRadius: 8, fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", sans-serif' } }}>
       <AntApp>
         <div className="app-shell">
-          <Sidebar projects={projectItems} selectedId={selectedId} onSelect={setSelectedId} onCreate={() => setDialogOpen(true)} />
+          <Sidebar projects={visibleProjects} selectedId={selectedId} onSelect={setSelectedId} onCreate={() => setDialogOpen(true)} searchValue={searchValue} onSearchChange={setSearchValue} />
           <Workspace project={project} stage={stage} onStageChange={setStage} />
         </div>
         <CreateProjectDialog open={dialogOpen} submitting={submitting} onCancel={() => setDialogOpen(false)} onCreate={handleCreate} />

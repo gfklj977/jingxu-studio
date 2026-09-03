@@ -22,6 +22,7 @@ button { font: inherit; }
 .star { color: #f59e0b; font-size: 12px; }
 .project-block { min-height: 0; flex: 1; }
 .project-list { display: grid; gap: 4px; }
+.project-empty { margin: 18px 8px; color: #94a3b8; font-size: 12px; text-align: center; }
 .project-item { display: flex; align-items: center; gap: 10px; padding: 10px; border-radius: 8px; background: transparent; color: #334155; }
 .project-item:hover { background: #f8fafc; }
 .project-item.selected { color: #0f766e; background: #e9f7f4; }
