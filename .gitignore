@@ -4,6 +4,10 @@ __pycache__/
 .pytest_cache/
 *.pyc
 dist/
+backend-dist/
+build/
+release/
+*.spec
 coverage/
 .env
 .env.*

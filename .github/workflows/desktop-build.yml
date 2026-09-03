@@ -1,0 +1,41 @@
+name: Desktop builds
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - "v*"
+
+jobs:
+  package:
+    strategy:
+      matrix:
+        include:
+          - os: macos-14
+            command: desktop:pack:mac
+          - os: windows-2022
+            command: desktop:pack:win
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+      - run: python -m venv .venv
+      - if: runner.os != 'Windows'
+        run: .venv/bin/pip install -r backend/requirements.txt
+      - if: runner.os == 'Windows'
+        run: .venv/Scripts/pip install -r backend/requirements.txt
+      - run: npm ci
+      - run: npm run ${{ matrix.command }}
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: "false"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: jingxu-${{ runner.os }}
+          path: release/*
