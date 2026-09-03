@@ -1,3 +1,5 @@
+import json
+
 from fastapi.testclient import TestClient
 
 from app.main import create_app
@@ -22,6 +24,11 @@ class FakeAsrRecognizer:
             {"start_time": 450, "end_time": 1530, "text": "第一句字幕。"},
             {"start_time": 1700, "end_time": 3205, "text": "第二句字幕。"},
         ]
+
+
+class FakeImageGenerator:
+    def generate(self, *, api_key, model, prompt, size):
+        return f"image:{prompt}".encode()
 
 
 class FakeSecretStore:
@@ -392,3 +399,23 @@ def test_subtitle_stage_recognizes_audio_and_writes_srt(tmp_path):
     assert loaded.json()["stages"][0] == {"name": "SUBTITLES", "status": "COMPLETED", "progress": 100}
     subtitle_path = tmp_path / "projects" / str(project["id"]) / "subtitles" / "captions.srt"
     assert subtitle_path.read_text() == "1\n00:00:00,450 --> 00:00:01,530\n第一句字幕。\n\n2\n00:00:01,700 --> 00:00:03,205\n第二句字幕。\n"
+
+
+def test_storyboard_stage_splits_script_and_saves_images_and_manifest(tmp_path):
+    secret_store = FakeSecretStore()
+    secret_store.set("seedream", "ark-key")
+    executor = PreflightProductionExecutor(image_generator=FakeImageGenerator())
+    with make_client(tmp_path, secret_store=secret_store, production_executor=executor) as client:
+        project = client.post("/api/projects", json={"title": "分镜任务", "channel": "默认栏目"}).json()
+        client.put(f"/api/projects/{project['id']}/script", json={"content": "孩子跑进阳光下的花园。妈妈蹲下拥抱孩子！"})
+        client.put(f"/api/projects/{project['id']}/production-settings", json={"stages": ["STORYBOARD"], "storyboardCount": 2})
+        client.post(f"/api/projects/{project['id']}/production-jobs")
+        loaded = client.get(f"/api/projects/{project['id']}/production-jobs/latest")
+
+    assert loaded.json()["status"] == "COMPLETED"
+    assert loaded.json()["stages"][0] == {"name": "STORYBOARD", "status": "COMPLETED", "progress": 100}
+    storyboard_dir = tmp_path / "projects" / str(project["id"]) / "storyboard"
+    assert (storyboard_dir / "scene-001.png").read_bytes().startswith(b"image:")
+    assert (storyboard_dir / "scene-002.png").exists()
+    manifest = json.loads((storyboard_dir / "manifest.json").read_text())
+    assert [item["sourceText"] for item in manifest["scenes"]] == ["孩子跑进阳光下的花园。", "妈妈蹲下拥抱孩子！"]

@@ -144,6 +144,8 @@ class ProductionSettings(BaseModel):
     ttsAppId: str = ""
     ttsVoiceType: str = "zh_male_M392_conversation_wvae_bigtts"
     asrAppId: str = ""
+    seedreamModel: str = "doubao-seedream-4-0-250828"
+    storyboardCount: int = Field(default=6, ge=1, le=20)
 
 
 class ProductionJobStage(BaseModel):

@@ -1,4 +1,6 @@
 import base64
+import json
+import re
 import uuid
 from typing import Optional, Protocol
 
@@ -66,12 +68,42 @@ def render_srt(utterances: list[dict]) -> str:
     return "\n\n".join(blocks) + "\n"
 
 
+class ImageGenerator(Protocol):
+    def generate(self, *, api_key: str, model: str, prompt: str, size: str) -> bytes: ...
+
+
+class HttpSeedreamImageGenerator:
+    def generate(self, *, api_key: str, model: str, prompt: str, size: str) -> bytes:
+        response = httpx.post(
+            "https://ark.cn-beijing.volces.com/api/v3/images/generations",
+            headers={"Authorization": f"Bearer {api_key}"},
+            json={"model": model, "prompt": prompt, "size": size, "sequential_image_generation": "disabled", "stream": False, "response_format": "url", "watermark": False},
+            timeout=180,
+        )
+        response.raise_for_status()
+        data = response.json().get("data", [])
+        if not data or not data[0].get("url"):
+            raise RuntimeError("Seedream 未返回图片")
+        image_response = httpx.get(data[0]["url"], timeout=120)
+        image_response.raise_for_status()
+        return image_response.content
+
+
+def build_storyboard(script: str, count: int) -> list[dict]:
+    sentences = [part.strip() for part in re.findall(r"[^。！？!?\n]+[。！？!?]?", script) if part.strip()]
+    scenes = sentences[:count]
+    if not scenes:
+        return []
+    return [{"index": index, "sourceText": text, "prompt": f"电影感纪实摄影，16:9横构图，自然光，人物一致，真实细节，无文字无水印。画面内容：{text}"} for index, text in enumerate(scenes, 1)]
+
+
 class PreflightProductionExecutor:
     REQUIRED_PROVIDERS = {"AUDIO": "doubao_tts", "SUBTITLES": "doubao_asr", "STORYBOARD": "seedream", "COVER": "seedream"}
 
-    def __init__(self, tts_synthesizer: Optional[TtsSynthesizer] = None, asr_recognizer: Optional[AsrRecognizer] = None):
+    def __init__(self, tts_synthesizer: Optional[TtsSynthesizer] = None, asr_recognizer: Optional[AsrRecognizer] = None, image_generator: Optional[ImageGenerator] = None):
         self.tts_synthesizer = tts_synthesizer or HttpDoubaoTtsSynthesizer()
         self.asr_recognizer = asr_recognizer or HttpDoubaoAsrRecognizer()
+        self.image_generator = image_generator or HttpSeedreamImageGenerator()
 
     def execute(self, repository: ProjectRepository, job_id: int, secrets: SecretStore) -> None:
         job = repository.update_production_job(job_id, status="RUNNING", log="开始生产前检查")
@@ -119,6 +151,21 @@ class PreflightProductionExecutor:
                     repository.update_production_job(job_id, status="RUNNING", stage_name="SUBTITLES", stage_status="COMPLETED", progress=100, log=f"字幕已保存：{output}")
                 except Exception as error:
                     repository.update_production_job(job_id, status="FAILED", failed_stage="SUBTITLES", log=f"字幕生成失败：{error}")
+                    return
+            elif stage.name.value == "STORYBOARD":
+                scenes = build_storyboard(script.content, settings.storyboardCount)
+                repository.update_production_job(job_id, status="RUNNING", stage_name="STORYBOARD", stage_status="RUNNING", progress=5, log=f"已拆分 {len(scenes)} 个分镜，开始生成图片")
+                output = repository.database_path.parent / "projects" / str(job.projectId) / "storyboard"
+                output.mkdir(parents=True, exist_ok=True)
+                try:
+                    for index, scene in enumerate(scenes, 1):
+                        image = self.image_generator.generate(api_key=secrets.get("seedream") or "", model=settings.seedreamModel, prompt=scene["prompt"], size="2K")
+                        (output / f"scene-{index:03}.png").write_bytes(image)
+                        progress = round(index / len(scenes) * 100)
+                        repository.update_production_job(job_id, status="RUNNING", stage_name="STORYBOARD", stage_status="RUNNING" if index < len(scenes) else "COMPLETED", progress=progress, log=f"分镜 {index}/{len(scenes)} 已生成")
+                    (output / "manifest.json").write_text(json.dumps({"model": settings.seedreamModel, "scenes": scenes}, ensure_ascii=False, indent=2), encoding="utf-8")
+                except Exception as error:
+                    repository.update_production_job(job_id, status="FAILED", failed_stage="STORYBOARD", log=f"分镜生成失败：{error}")
                     return
             elif stage.name.value != "VIDEO":
                 repository.update_production_job(job_id, status="QUEUED", log=f"{stage.name.value} 等待媒体执行器")
