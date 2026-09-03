@@ -81,6 +81,17 @@ class ProjectScript(SaveScript):
     versions: List[ScriptVersion]
 
 
+class ProviderStatus(BaseModel):
+    id: str
+    name: str
+    capability: str
+    status: str
+
+
+class ProviderCatalog(BaseModel):
+    data: List[ProviderStatus]
+
+
 class Pagination(BaseModel):
     page: int
     pageSize: int

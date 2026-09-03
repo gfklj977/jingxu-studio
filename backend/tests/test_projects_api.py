@@ -179,3 +179,16 @@ def test_script_rejects_oversized_input_and_unknown_project(tmp_path):
 
     assert oversized.status_code == 422
     assert missing.status_code == 404
+
+
+def test_provider_catalog_reports_reference_services_as_unconfigured(tmp_path):
+    with make_client(tmp_path) as client:
+        response = client.get("/api/settings/providers")
+
+    assert response.status_code == 200
+    providers = response.json()["data"]
+    assert {item["id"] for item in providers} == {
+        "deepseek", "doubao_search", "tavily", "seedream", "apiyi", "shengsuanyun", "doubao_tts", "doubao_asr"
+    }
+    assert all(item["status"] == "MISSING" for item in providers)
+    assert all("apiKey" not in item for item in providers)

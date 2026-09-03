@@ -7,7 +7,7 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 
 from .database import InvalidProjectOrder, ProjectNotFound, ProjectRepository
-from .schemas import CreateProject, PaginatedResponse, Pagination, Project, ProjectOrder, ProjectScript, SaveScript, UpdateProject
+from .schemas import CreateProject, PaginatedResponse, Pagination, Project, ProjectOrder, ProjectScript, ProviderCatalog, ProviderStatus, SaveScript, UpdateProject
 
 
 DEFAULT_DATA_PATH = Path.home() / "Library" / "Application Support" / "JingxuStudio" / "data" / "app.db"
@@ -127,6 +127,20 @@ def create_app(database_path: Path = DEFAULT_DATA_PATH) -> FastAPI:
     @app.put("/api/projects/{project_id}/script", response_model=ProjectScript)
     def save_project_script(project_id: int, payload: SaveScript):
         return repository.save_script(project_id, payload)
+
+    @app.get("/api/settings/providers", response_model=ProviderCatalog)
+    def list_providers():
+        configured = [
+            ("deepseek", "DeepSeek", "文本生成"),
+            ("doubao_search", "豆包搜索", "联网搜索"),
+            ("tavily", "Tavily", "联网搜索"),
+            ("seedream", "火山方舟 Seedream", "图像生成"),
+            ("apiyi", "API易 GPT-Image-2", "图像生成"),
+            ("shengsuanyun", "胜算云 GPT-Image-2", "图像生成"),
+            ("doubao_tts", "豆包 TTS", "语音合成"),
+            ("doubao_asr", "豆包 ASR", "语音识别"),
+        ]
+        return ProviderCatalog(data=[ProviderStatus(id=id_, name=name, capability=capability, status="MISSING") for id_, name, capability in configured])
 
     return app
 
