@@ -28,7 +28,7 @@
 
 ## Phase 1: Foundation
 
-- [ ] Task 3 — Bootstrap React/FastAPI local application shell.
+- [x] Task 3 — Bootstrap React/FastAPI local application shell.
 - [ ] Task 4 — Add SQLite migrations and safe artifact directories.
 - [ ] Task 5 — Build resizable sidebar, header, routes, and design tokens.
 - [ ] Checkpoint — Persistence, deep links, localhost binding, and golden shell pass.
