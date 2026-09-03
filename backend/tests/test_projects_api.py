@@ -70,8 +70,8 @@ class FakeProviderTester:
         return f"生成脚本：{topic}\n{brief}\n{research_notes}"
 
 
-def make_client(tmp_path, secret_store=None, provider_tester=None, production_executor=None):
-    app = create_app(tmp_path / "jingxu-test.db", secret_store=secret_store or FakeSecretStore(), provider_tester=provider_tester or FakeProviderTester(), production_executor=production_executor or NoopProductionExecutor())
+def make_client(tmp_path, secret_store=None, provider_tester=None, production_executor=None, folder_opener=None):
+    app = create_app(tmp_path / "jingxu-test.db", secret_store=secret_store or FakeSecretStore(), provider_tester=provider_tester or FakeProviderTester(), production_executor=production_executor or NoopProductionExecutor(), folder_opener=folder_opener)
     return TestClient(app)
 
 
@@ -490,3 +490,25 @@ def test_project_artifacts_are_listed_and_served_without_path_traversal(tmp_path
     assert listed.json()["data"][1]["kind"] == "video"
     assert served.content == b"video-data"
     assert traversal.status_code == 404
+
+
+def test_single_stage_job_override_does_not_change_saved_pipeline(tmp_path):
+    with make_client(tmp_path) as client:
+        project = client.post("/api/projects", json={"title": "重新生成", "channel": "默认栏目"}).json()
+        created = client.post(f"/api/projects/{project['id']}/production-jobs", json={"stages": ["COVER"]})
+        settings = client.get(f"/api/projects/{project['id']}/production-settings")
+
+    assert [stage["name"] for stage in created.json()["stages"]] == ["COVER"]
+    assert len(settings.json()["stages"]) == 5
+
+
+def test_open_project_folder_creates_directory_and_uses_system_opener(tmp_path):
+    opened = []
+    with make_client(tmp_path, folder_opener=opened.append) as client:
+        project = client.post("/api/projects", json={"title": "打开目录", "channel": "默认栏目"}).json()
+        response = client.post(f"/api/projects/{project['id']}/artifacts/open-folder")
+
+    expected = tmp_path / "projects" / str(project["id"])
+    assert response.status_code == 204
+    assert expected.is_dir()
+    assert opened == [expected]

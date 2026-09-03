@@ -170,7 +170,7 @@ export async function saveProductionSettings(projectId: number, settings: Produc
 }
 
 export interface ProductionJob { id: number; projectId: number; status: 'QUEUED' | 'RUNNING' | 'COMPLETED' | 'FAILED' | 'CANCELLED'; stages: { name: ProductionStage; status: string; progress: number }[]; logs: string[]; createdAt: string; updatedAt: string }
-export async function createProductionJob(projectId: number): Promise<ProductionJob> { const response = await fetch(`/api/projects/${projectId}/production-jobs`, { method: 'POST' }); if (!response.ok) throw new Error('任务启动失败'); return response.json() as Promise<ProductionJob> }
+export async function createProductionJob(projectId: number, stages?: ProductionStage[]): Promise<ProductionJob> { const response = await fetch(`/api/projects/${projectId}/production-jobs`, { method: 'POST', ...(stages ? { headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ stages }) } : {}) }); if (!response.ok) throw new Error('任务启动失败'); return response.json() as Promise<ProductionJob> }
 export async function getLatestProductionJob(projectId: number): Promise<ProductionJob | null> { const response = await fetch(`/api/projects/${projectId}/production-jobs/latest`); if (response.status === 404) return null; if (!response.ok) throw new Error('任务加载失败'); return response.json() as Promise<ProductionJob> }
 export async function cancelProductionJob(jobId: number): Promise<ProductionJob> { const response = await fetch(`/api/production-jobs/${jobId}/cancel`, { method: 'POST' }); if (!response.ok) throw new Error('任务取消失败'); return response.json() as Promise<ProductionJob> }
 
@@ -178,3 +178,4 @@ export type ArtifactKind = 'video' | 'image' | 'audio' | 'document'
 export interface ProjectArtifact { path: string; name: string; kind: ArtifactKind; size: number }
 export async function listProjectArtifacts(projectId: number): Promise<ProjectArtifact[]> { const response = await fetch(`/api/projects/${projectId}/artifacts`); if (!response.ok) throw new Error('产物加载失败'); return ((await response.json()) as { data: ProjectArtifact[] }).data }
 export function projectArtifactUrl(projectId: number, path: string): string { return `/api/projects/${projectId}/artifacts/${path.split('/').map(encodeURIComponent).join('/')}` }
+export async function openProjectArtifactsFolder(projectId: number): Promise<void> { const response = await fetch(`/api/projects/${projectId}/artifacts/open-folder`, { method: 'POST' }); if (!response.ok) throw new Error('文件夹打开失败') }

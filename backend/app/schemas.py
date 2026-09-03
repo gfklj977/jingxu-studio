@@ -154,6 +154,10 @@ class ProductionJobStage(BaseModel):
     progress: int = 0
 
 
+class CreateProductionJob(BaseModel):
+    stages: Optional[List[ProductionStage]] = Field(default=None, min_length=1)
+
+
 class ProductionJob(BaseModel):
     id: int
     projectId: int

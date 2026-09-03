@@ -4,12 +4,14 @@ import {
   DownloadOutlined,
   FileImageOutlined,
   FileTextOutlined,
+  FolderOpenOutlined,
+  RedoOutlined,
   ReloadOutlined,
   SoundOutlined,
 } from '@ant-design/icons'
-import { Button, Tag } from 'antd'
+import { Button, Tag, message } from 'antd'
 import { useCallback, useEffect, useState } from 'react'
-import { listProjectArtifacts, projectArtifactUrl, type ArtifactKind, type ProjectArtifact } from '../api/projects'
+import { createProductionJob, listProjectArtifacts, openProjectArtifactsFolder, projectArtifactUrl, type ArtifactKind, type ProductionStage, type ProjectArtifact } from '../api/projects'
 import type { Project, Stage } from '../types'
 import { ScriptWorkspace } from './ScriptWorkspace'
 import { ProductionWorkspace } from './ProductionWorkspace'
@@ -31,6 +33,7 @@ function ResultsView({ projectId, enabled }: { projectId: number; enabled: boole
   const [filter, setFilter] = useState<ArtifactKind | 'all'>('all')
   const [loading, setLoading] = useState(enabled)
   const [error, setError] = useState('')
+  const [regenerating, setRegenerating] = useState<ProductionStage | null>(null)
   const load = useCallback(async () => { setLoading(true); setError(''); try { setArtifacts(await listProjectArtifacts(projectId)) } catch { setError('生成结果加载失败') } finally { setLoading(false) } }, [projectId])
   useEffect(() => {
     if (!enabled) return
@@ -39,38 +42,42 @@ function ResultsView({ projectId, enabled }: { projectId: number; enabled: boole
     return () => { active = false }
   }, [enabled, projectId])
   const visible = filter === 'all' ? artifacts : artifacts.filter((item) => item.kind === filter)
+  async function openFolder() { try { await openProjectArtifactsFolder(projectId) } catch { message.error('无法打开项目文件夹') } }
+  async function regenerate(stage: ProductionStage) { setRegenerating(stage); try { await createProductionJob(projectId, [stage]); message.success('已创建重新生成任务，请在“生产”页查看进度') } catch { message.error('重新生成失败，请检查是否已有任务运行') } finally { setRegenerating(null) } }
   return (
     <section className="content-section" aria-labelledby="results-title">
       <div className="section-heading">
         <div><h3 id="results-title">项目成片</h3><p>统一查看、下载并整理本项目生成的全部内容</p></div>
-        <div className="heading-actions"><Button loading={loading} icon={<ReloadOutlined />} onClick={load}>同步文件</Button></div>
+        <div className="heading-actions"><Button loading={loading} icon={<ReloadOutlined />} onClick={load}>同步文件</Button><Button type="primary" icon={<FolderOpenOutlined />} onClick={openFolder}>打开项目文件夹</Button></div>
       </div>
       <div className="filter-row">
         <div className="filter-pills">{(['all', 'video', 'image', 'audio', 'document'] as const).map((kind) => <button key={kind} className={filter === kind ? 'active' : ''} onClick={() => setFilter(kind)}>{artifactLabels[kind]} <b>{kind === 'all' ? artifacts.length : artifacts.filter((item) => item.kind === kind).length}</b></button>)}</div>
       </div>
-      {error ? <div className="asset-empty">{error}</div> : !loading && visible.length === 0 ? <div className="asset-empty">还没有生成产物，请先在“生产”中运行流水线。</div> : <div className="asset-grid">{visible.map((artifact) => <ArtifactCard key={artifact.path} projectId={projectId} artifact={artifact} />)}</div>}
+      {error ? <div className="asset-empty">{error}</div> : !loading && visible.length === 0 ? <div className="asset-empty">还没有生成产物，请先在“生产”中运行流水线。</div> : <div className="asset-grid">{visible.map((artifact) => <ArtifactCard key={artifact.path} projectId={projectId} artifact={artifact} regenerating={regenerating} onRegenerate={regenerate} />)}</div>}
     </section>
   )
 }
 
-function ArtifactCard({ projectId, artifact }: { projectId: number; artifact: ProjectArtifact }) {
+function artifactStage(path: string): ProductionStage | null { if (path.startsWith('audio/')) return 'AUDIO'; if (path.startsWith('subtitles/')) return 'SUBTITLES'; if (path.startsWith('storyboard/')) return 'STORYBOARD'; if (path.startsWith('cover/')) return 'COVER'; if (path.startsWith('video/')) return 'VIDEO'; return null }
+function ArtifactCard({ projectId, artifact, regenerating, onRegenerate }: { projectId: number; artifact: ProjectArtifact; regenerating: ProductionStage | null; onRegenerate: (stage: ProductionStage) => void }) {
   const url = projectArtifactUrl(projectId, artifact.path)
+  const stage = artifactStage(artifact.path)
   const icon = artifact.kind === 'image' ? <FileImageOutlined /> : artifact.kind === 'audio' ? <SoundOutlined /> : <FileTextOutlined />
   return <article className={`asset-card ${artifact.kind === 'video' ? 'featured' : ''}`}>
     {artifact.kind === 'video' && <video className="video-preview" aria-label={`预览 ${artifact.name}`} src={url} controls preload="metadata" />}
     {artifact.kind === 'image' && <img className="image-preview" alt={artifact.name} src={url} loading="lazy" />}
     {artifact.kind === 'audio' && <div className="audio-preview"><SoundOutlined /><audio aria-label={`预览 ${artifact.name}`} src={url} controls preload="metadata" /></div>}
     {artifact.kind === 'document' && <a className="document-preview" href={url} target="_blank" rel="noreferrer"><FileTextOutlined /><span>查看文稿</span><i /><i /><i /></a>}
-    <AssetMeta icon={icon} title={artifact.name} subtitle={`${artifact.path} · ${formatBytes(artifact.size)}`} url={url} />
+    <AssetMeta icon={icon} title={artifact.name} subtitle={`${artifact.path} · ${formatBytes(artifact.size)}`} url={url} stage={stage} regenerating={regenerating} onRegenerate={onRegenerate} />
   </article>
 }
 
-function AssetMeta({ icon, title, subtitle, url }: { icon: React.ReactNode; title: string; subtitle: string; url: string }) {
+function AssetMeta({ icon, title, subtitle, url, stage, regenerating, onRegenerate }: { icon: React.ReactNode; title: string; subtitle: string; url: string; stage: ProductionStage | null; regenerating: ProductionStage | null; onRegenerate: (stage: ProductionStage) => void }) {
   return (
     <div className="asset-meta">
       <span className="asset-type">{icon}</span>
       <span><strong>{title}</strong><small>{subtitle}</small></span>
-      <div className="asset-actions"><a aria-label={`下载 ${title}`} href={url} download={title}><DownloadOutlined /></a></div>
+      <div className="asset-actions">{stage && <button aria-label={`重新生成 ${title}`} disabled={regenerating !== null} onClick={() => onRegenerate(stage)}>{regenerating === stage ? '…' : <RedoOutlined />}</button>}<a aria-label={`下载 ${title}`} href={url} download={title}><DownloadOutlined /></a></div>
     </div>
   )
 }

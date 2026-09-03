@@ -1,8 +1,10 @@
 import math
 import httpx
+import platform
+import subprocess
 from contextlib import asynccontextmanager
 from pathlib import Path
-from typing import Optional
+from typing import Callable, Optional
 
 from fastapi import BackgroundTasks, FastAPI, HTTPException, Query, Request
 from fastapi.exceptions import RequestValidationError
@@ -11,7 +13,7 @@ from fastapi.responses import FileResponse, JSONResponse
 from .database import ActiveProductionJob, InvalidProjectOrder, ProjectNotFound, ProjectRepository
 from .providers import HttpProviderTester, ProviderTester
 from .production import PreflightProductionExecutor, ProductionExecutor
-from .schemas import CreateProject, GeneratedScript, GenerateScriptRequest, PaginatedResponse, Pagination, ProductionJob, ProductionSettings, Project, ProjectArtifact, ProjectArtifactList, ProjectOrder, ProjectScript, ProviderCatalog, ProviderSecret, ProviderStatus, ProviderTestResult, ResearchItem, ResearchRequest, ResearchResult, SaveScript, UpdateProject
+from .schemas import CreateProductionJob, CreateProject, GeneratedScript, GenerateScriptRequest, PaginatedResponse, Pagination, ProductionJob, ProductionSettings, Project, ProjectArtifact, ProjectArtifactList, ProjectOrder, ProjectScript, ProviderCatalog, ProviderSecret, ProviderStatus, ProviderTestResult, ResearchItem, ResearchRequest, ResearchResult, SaveScript, UpdateProject
 from .secrets import KeyringSecretStore, SecretStore
 
 
@@ -31,11 +33,17 @@ PROVIDERS = [
 PROVIDER_IDS = {item[0] for item in PROVIDERS}
 
 
-def create_app(database_path: Path = DEFAULT_DATA_PATH, secret_store: Optional[SecretStore] = None, provider_tester: Optional[ProviderTester] = None, production_executor: Optional[ProductionExecutor] = None) -> FastAPI:
+def _open_folder(path: Path) -> None:
+    command = ["open", str(path)] if platform.system() == "Darwin" else ["explorer", str(path)] if platform.system() == "Windows" else ["xdg-open", str(path)]
+    subprocess.Popen(command)
+
+
+def create_app(database_path: Path = DEFAULT_DATA_PATH, secret_store: Optional[SecretStore] = None, provider_tester: Optional[ProviderTester] = None, production_executor: Optional[ProductionExecutor] = None, folder_opener: Optional[Callable[[Path], None]] = None) -> FastAPI:
     repository = ProjectRepository(Path(database_path))
     secrets = secret_store or KeyringSecretStore()
     tester = provider_tester or HttpProviderTester()
     executor = production_executor or PreflightProductionExecutor()
+    open_folder = folder_opener or _open_folder
 
     @asynccontextmanager
     async def lifespan(_: FastAPI):
@@ -214,8 +222,8 @@ def create_app(database_path: Path = DEFAULT_DATA_PATH, secret_store: Optional[S
         return repository.save_production_settings(project_id, payload)
 
     @app.post("/api/projects/{project_id}/production-jobs", response_model=ProductionJob, status_code=201)
-    def create_production_job(project_id: int, background_tasks: BackgroundTasks):
-        job = repository.create_production_job(project_id)
+    def create_production_job(project_id: int, background_tasks: BackgroundTasks, payload: Optional[CreateProductionJob] = None):
+        job = repository.create_production_job(project_id, payload.stages if payload else None)
         background_tasks.add_task(executor.execute, repository, job.id, secrets)
         return job
 
@@ -234,6 +242,13 @@ def create_app(database_path: Path = DEFAULT_DATA_PATH, secret_store: Optional[S
         kinds = {".mp4": "video", ".mp3": "audio", ".png": "image", ".jpg": "image", ".jpeg": "image", ".svg": "image", ".srt": "document", ".json": "document"}
         artifacts = [] if not root.exists() else [ProjectArtifact(path=str(path.relative_to(root)), name=path.name, kind=kinds[path.suffix.lower()], size=path.stat().st_size) for path in sorted(root.rglob("*")) if path.is_file() and path.suffix.lower() in kinds]
         return ProjectArtifactList(data=artifacts)
+
+    @app.post("/api/projects/{project_id}/artifacts/open-folder", status_code=204)
+    def open_project_artifacts_folder(project_id: int):
+        repository.get(project_id)
+        root = repository.database_path.parent / "projects" / str(project_id)
+        root.mkdir(parents=True, exist_ok=True)
+        open_folder(root)
 
     @app.get("/api/projects/{project_id}/artifacts/{artifact_path:path}")
     def get_project_artifact(project_id: int, artifact_path: str):

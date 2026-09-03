@@ -249,10 +249,10 @@ class ProjectRepository:
             connection.execute("INSERT INTO production_settings (project_id, payload, updated_at) VALUES (?, ?, ?) ON CONFLICT(project_id) DO UPDATE SET payload = excluded.payload, updated_at = excluded.updated_at", (project_id, payload.model_dump_json(), datetime.now(timezone.utc).isoformat()))
         return payload
 
-    def create_production_job(self, project_id: int) -> ProductionJob:
+    def create_production_job(self, project_id: int, selected_stages=None) -> ProductionJob:
         settings = self.get_production_settings(project_id)
         now = datetime.now(timezone.utc).isoformat()
-        stages = [ProductionJobStage(name=stage).model_dump(mode="json") for stage in settings.stages]
+        stages = [ProductionJobStage(name=stage).model_dump(mode="json") for stage in (selected_stages or settings.stages)]
         with self._connect() as connection:
             active = connection.execute("SELECT id FROM production_jobs WHERE project_id = ? AND status IN ('QUEUED', 'RUNNING')", (project_id,)).fetchone()
             if active:
