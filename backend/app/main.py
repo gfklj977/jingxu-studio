@@ -10,7 +10,7 @@ from fastapi.responses import JSONResponse
 
 from .database import InvalidProjectOrder, ProjectNotFound, ProjectRepository
 from .providers import HttpProviderTester, ProviderTester
-from .schemas import CreateProject, PaginatedResponse, Pagination, Project, ProjectOrder, ProjectScript, ProviderCatalog, ProviderSecret, ProviderStatus, ProviderTestResult, SaveScript, UpdateProject
+from .schemas import CreateProject, GeneratedScript, GenerateScriptRequest, PaginatedResponse, Pagination, Project, ProjectOrder, ProjectScript, ProviderCatalog, ProviderSecret, ProviderStatus, ProviderTestResult, ResearchItem, ResearchRequest, ResearchResult, SaveScript, UpdateProject
 from .secrets import KeyringSecretStore, SecretStore
 
 
@@ -175,6 +175,29 @@ def create_app(database_path: Path = DEFAULT_DATA_PATH, secret_store: Optional[S
         except (httpx.HTTPError, ValueError):
             return JSONResponse(status_code=502, content={"error": {"code": "PROVIDER_TEST_FAILED", "message": "连接失败，请检查密钥和网络"}})
         return ProviderTestResult(status="VALID", latencyMs=latency)
+
+    @app.post("/api/projects/{project_id}/research", response_model=ResearchResult)
+    def research_project(project_id: int, payload: ResearchRequest):
+        repository.get(project_id)
+        api_key = secrets.get("tavily")
+        if not api_key:
+            return JSONResponse(status_code=409, content={"error": {"code": "PROVIDER_NOT_CONFIGURED", "message": "请先配置 Tavily"}})
+        try:
+            results = tester.search(api_key, payload.query)
+            return ResearchResult(data=[ResearchItem(**item) for item in results])
+        except (httpx.HTTPError, ValueError):
+            return JSONResponse(status_code=502, content={"error": {"code": "SEARCH_FAILED", "message": "联网搜索失败"}})
+
+    @app.post("/api/projects/{project_id}/script/generate", response_model=GeneratedScript)
+    def generate_project_script(project_id: int, payload: GenerateScriptRequest):
+        repository.get(project_id)
+        api_key = secrets.get("deepseek")
+        if not api_key:
+            return JSONResponse(status_code=409, content={"error": {"code": "PROVIDER_NOT_CONFIGURED", "message": "请先配置 DeepSeek"}})
+        try:
+            return GeneratedScript(content=tester.generate(api_key, payload.topic, payload.brief, payload.researchNotes))
+        except (httpx.HTTPError, ValueError):
+            return JSONResponse(status_code=502, content={"error": {"code": "GENERATION_FAILED", "message": "脚本生成失败"}})
 
     return app
 

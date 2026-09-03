@@ -101,6 +101,30 @@ class ProviderTestResult(BaseModel):
     latencyMs: int
 
 
+class ResearchRequest(BaseModel):
+    query: str = Field(min_length=2, max_length=300)
+
+
+class ResearchItem(BaseModel):
+    title: str = Field(max_length=500)
+    url: str = Field(max_length=2000)
+    content: str = Field(max_length=4000)
+
+
+class ResearchResult(BaseModel):
+    data: List[ResearchItem]
+
+
+class GenerateScriptRequest(BaseModel):
+    topic: str = Field(min_length=1, max_length=200)
+    brief: str = Field(default="", max_length=4000)
+    researchNotes: str = Field(default="", max_length=20000)
+
+
+class GeneratedScript(BaseModel):
+    content: str = Field(max_length=50000)
+
+
 class Pagination(BaseModel):
     page: int
     pageSize: int

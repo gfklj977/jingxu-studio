@@ -25,6 +25,12 @@ class FakeProviderTester:
         self.calls.append((provider_id, api_key))
         return 42
 
+    def search(self, api_key, query):
+        return [{"title": "官方资料", "url": "https://example.com/source", "content": f"{query}的资料摘要"}]
+
+    def generate(self, api_key, topic, brief, research_notes):
+        return f"生成脚本：{topic}\n{brief}\n{research_notes}"
+
 
 def make_client(tmp_path, secret_store=None, provider_tester=None):
     app = create_app(tmp_path / "jingxu-test.db", secret_store=secret_store or FakeSecretStore(), provider_tester=provider_tester or FakeProviderTester())
@@ -260,3 +266,28 @@ def test_provider_connection_requires_configuration(tmp_path):
 
     assert response.status_code == 409
     assert response.json()["error"]["code"] == "PROVIDER_NOT_CONFIGURED"
+
+
+def test_project_research_and_script_generation_use_configured_providers(tmp_path):
+    store = FakeSecretStore()
+    store.set("tavily", "tvly-private-test")
+    store.set("deepseek", "sk-private-test")
+    with make_client(tmp_path, store, FakeProviderTester()) as client:
+        project = client.post("/api/projects", json={"title": "AI 摄影", "channel": "默认栏目"}).json()
+        research = client.post(f"/api/projects/{project['id']}/research", json={"query": "AI 摄影趋势"})
+        generated = client.post(f"/api/projects/{project['id']}/script/generate", json={"topic": "AI 摄影", "brief": "面向门店", "researchNotes": "有引用的资料"})
+
+    assert research.status_code == 200
+    assert research.json()["data"][0]["url"] == "https://example.com/source"
+    assert generated.status_code == 200
+    assert generated.json()["content"].startswith("生成脚本：AI 摄影")
+
+
+def test_research_requires_existing_project_and_configured_provider(tmp_path):
+    with make_client(tmp_path) as client:
+        missing_project = client.post("/api/projects/999/research", json={"query": "正常查询"})
+        project = client.post("/api/projects", json={"title": "未配置", "channel": "默认栏目"}).json()
+        missing_key = client.post(f"/api/projects/{project['id']}/research", json={"query": "正常查询"})
+
+    assert missing_project.status_code == 404
+    assert missing_key.status_code == 409
