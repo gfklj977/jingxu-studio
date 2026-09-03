@@ -17,8 +17,17 @@ class FakeSecretStore:
         self.values.pop(provider_id, None)
 
 
-def make_client(tmp_path, secret_store=None):
-    app = create_app(tmp_path / "jingxu-test.db", secret_store=secret_store or FakeSecretStore())
+class FakeProviderTester:
+    def __init__(self):
+        self.calls = []
+
+    def test(self, provider_id, api_key):
+        self.calls.append((provider_id, api_key))
+        return 42
+
+
+def make_client(tmp_path, secret_store=None, provider_tester=None):
+    app = create_app(tmp_path / "jingxu-test.db", secret_store=secret_store or FakeSecretStore(), provider_tester=provider_tester or FakeProviderTester())
     return TestClient(app)
 
 
@@ -230,3 +239,24 @@ def test_provider_secret_rejects_unknown_provider_and_invalid_key(tmp_path):
 
     assert unknown.status_code == 404
     assert short.status_code == 422
+
+
+def test_provider_connection_uses_stored_secret_without_exposing_it(tmp_path):
+    store = FakeSecretStore()
+    tester = FakeProviderTester()
+    store.set("deepseek", "sk-private-test-value")
+    with make_client(tmp_path, store, tester) as client:
+        response = client.post("/api/settings/providers/deepseek/test")
+
+    assert response.status_code == 200
+    assert response.json() == {"status": "VALID", "latencyMs": 42}
+    assert tester.calls == [("deepseek", "sk-private-test-value")]
+    assert "sk-private" not in response.text
+
+
+def test_provider_connection_requires_configuration(tmp_path):
+    with make_client(tmp_path) as client:
+        response = client.post("/api/settings/providers/tavily/test")
+
+    assert response.status_code == 409
+    assert response.json()["error"]["code"] == "PROVIDER_NOT_CONFIGURED"

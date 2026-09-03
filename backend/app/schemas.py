@@ -96,6 +96,11 @@ class ProviderSecret(BaseModel):
     apiKey: SecretStr = Field(min_length=8, max_length=500)
 
 
+class ProviderTestResult(BaseModel):
+    status: str
+    latencyMs: int
+
+
 class Pagination(BaseModel):
     page: int
     pageSize: int

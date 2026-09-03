@@ -1,4 +1,5 @@
 import math
+import httpx
 from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Optional
@@ -8,7 +9,8 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 
 from .database import InvalidProjectOrder, ProjectNotFound, ProjectRepository
-from .schemas import CreateProject, PaginatedResponse, Pagination, Project, ProjectOrder, ProjectScript, ProviderCatalog, ProviderSecret, ProviderStatus, SaveScript, UpdateProject
+from .providers import HttpProviderTester, ProviderTester
+from .schemas import CreateProject, PaginatedResponse, Pagination, Project, ProjectOrder, ProjectScript, ProviderCatalog, ProviderSecret, ProviderStatus, ProviderTestResult, SaveScript, UpdateProject
 from .secrets import KeyringSecretStore, SecretStore
 
 
@@ -28,9 +30,10 @@ PROVIDERS = [
 PROVIDER_IDS = {item[0] for item in PROVIDERS}
 
 
-def create_app(database_path: Path = DEFAULT_DATA_PATH, secret_store: Optional[SecretStore] = None) -> FastAPI:
+def create_app(database_path: Path = DEFAULT_DATA_PATH, secret_store: Optional[SecretStore] = None, provider_tester: Optional[ProviderTester] = None) -> FastAPI:
     repository = ProjectRepository(Path(database_path))
     secrets = secret_store or KeyringSecretStore()
+    tester = provider_tester or HttpProviderTester()
 
     @asynccontextmanager
     async def lifespan(_: FastAPI):
@@ -159,6 +162,19 @@ def create_app(database_path: Path = DEFAULT_DATA_PATH, secret_store: Optional[S
         if provider_id not in PROVIDER_IDS:
             raise HTTPException(status_code=404, detail="服务不存在")
         secrets.delete(provider_id)
+
+    @app.post("/api/settings/providers/{provider_id}/test", response_model=ProviderTestResult)
+    def test_provider(provider_id: str):
+        if provider_id not in {"deepseek", "tavily"}:
+            raise HTTPException(status_code=501, detail="该服务的连接检测尚未实现")
+        api_key = secrets.get(provider_id)
+        if not api_key:
+            return JSONResponse(status_code=409, content={"error": {"code": "PROVIDER_NOT_CONFIGURED", "message": "请先配置服务密钥"}})
+        try:
+            latency = tester.test(provider_id, api_key)
+        except (httpx.HTTPError, ValueError):
+            return JSONResponse(status_code=502, content={"error": {"code": "PROVIDER_TEST_FAILED", "message": "连接失败，请检查密钥和网络"}})
+        return ProviderTestResult(status="VALID", latencyMs=latency)
 
     return app
 
