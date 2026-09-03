@@ -65,6 +65,7 @@
       "output": "release"
     },
     "mac": {
+      "icon": "build-resources/icon.icns",
       "target": [
         {
           "target": "dmg",
@@ -76,6 +77,7 @@
       "category": "public.app-category.video"
     },
     "win": {
+      "icon": "build-resources/icon.ico",
       "target": [
         {
           "target": "nsis",
