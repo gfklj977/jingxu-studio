@@ -7,6 +7,7 @@ const { spawn } = require('node:child_process')
 
 const { isAllowedPublishUrl } = require('./security.cjs')
 const { attachDesktopSmokeTest } = require('./smoke.cjs')
+const { terminateBackendProcess } = require('./process-tree.cjs')
 
 let backendProcess
 let desktopUrl
@@ -163,4 +164,4 @@ app.whenReady()
     app.quit()
   })
 app.on('window-all-closed', () => { if (process.platform !== 'darwin') app.quit() })
-app.on('before-quit', () => { if (backendProcess && !backendProcess.killed) backendProcess.kill() })
+app.on('before-quit', () => terminateBackendProcess(backendProcess))
