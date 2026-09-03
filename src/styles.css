@@ -109,6 +109,9 @@ button { font: inherit; }
 .provider-list article div { display: grid; gap: 3px; }
 .provider-list article small { color: #64748b; }
 .provider-icon { display: grid; place-items: center; width: 36px; height: 36px; border-radius: 9px; color: #0f766e; background: #f0fdfa; }
+.provider-actions { display: flex !important; grid-auto-flow: column; align-items: center; gap: 6px !important; }
+.provider-list article.editing { grid-template-columns: 38px 1fr auto; }
+.provider-editor { grid-column: 2 / -1; display: flex !important; flex-direction: row; gap: 8px !important; padding-top: 4px; }
 .placeholder-view > span { color: #0f766e; font-size: 40px; }
 .placeholder-view h3 { margin: 16px 0 0; color: #0f172a; }
 .placeholder-view p { max-width: 480px; margin: 8px 0 20px; }

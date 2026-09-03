@@ -167,4 +167,23 @@ describe('镜序工坊工作台', () => {
     expect(await screen.findByText('DeepSeek')).toBeInTheDocument()
     expect(screen.getByText('未配置')).toBeInTheDocument()
   })
+
+  it('保存服务密钥后刷新状态', async () => {
+    const user = userEvent.setup()
+    const fetchMock = vi.mocked(fetch)
+    fetchMock
+      .mockResolvedValueOnce({ ok: true, json: async () => ({ data: [], pagination: {} }) } as Response)
+      .mockResolvedValueOnce({ ok: true, json: async () => ({ data: [{ id: 'deepseek', name: 'DeepSeek', capability: '文本生成', status: 'MISSING' }] }) } as Response)
+      .mockResolvedValueOnce({ ok: true } as Response)
+      .mockResolvedValueOnce({ ok: true, json: async () => ({ data: [{ id: 'deepseek', name: 'DeepSeek', capability: '文本生成', status: 'READY' }] }) } as Response)
+    render(<App />)
+
+    await user.click(screen.getByRole('button', { name: 'AI 服务设置' }))
+    await user.click(await screen.findByRole('button', { name: '配置 DeepSeek' }))
+    await user.type(screen.getByLabelText('DeepSeek API 密钥'), 'sk-example-safe')
+    await user.click(screen.getByRole('button', { name: '保存 DeepSeek 密钥' }))
+
+    expect(fetchMock).toHaveBeenLastCalledWith('/api/settings/providers')
+    expect(await screen.findByText('已就绪')).toBeInTheDocument()
+  })
 })

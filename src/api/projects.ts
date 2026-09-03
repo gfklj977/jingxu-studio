@@ -118,3 +118,15 @@ export async function listProviders(): Promise<ProviderStatus[]> {
   if (!response.ok) throw new Error('服务状态加载失败')
   return ((await response.json()) as { data: ProviderStatus[] }).data
 }
+
+export async function saveProviderSecret(providerId: string, apiKey: string): Promise<void> {
+  const response = await fetch(`/api/settings/providers/${providerId}/secret`, {
+    method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ apiKey }),
+  })
+  if (!response.ok) throw new Error('密钥保存失败')
+}
+
+export async function deleteProviderSecret(providerId: string): Promise<void> {
+  const response = await fetch(`/api/settings/providers/${providerId}/secret`, { method: 'DELETE' })
+  if (!response.ok) throw new Error('密钥删除失败')
+}
