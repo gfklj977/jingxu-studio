@@ -2,13 +2,18 @@
   "name": "jingxu-studio",
   "private": true,
   "version": "0.1.0",
+  "main": "electron/main.cjs",
   "type": "module",
   "scripts": {
     "dev": "vite --host 127.0.0.1",
     "build": "tsc -b && vite build",
     "test": "vitest run",
     "test:watch": "vitest",
-    "lint": "eslint ."
+    "lint": "eslint .",
+    "api": "PYTHONPATH=backend .venv/bin/python -m uvicorn app.main:app --host 127.0.0.1 --port 8765",
+    "desktop:dev": "concurrently -k \"npm run api\" \"npm run dev\" \"wait-on http://127.0.0.1:5173 http://127.0.0.1:8765/api/health && cross-env JINGXU_DEV_URL=http://127.0.0.1:5173 electron .\"",
+    "desktop:pack:mac": "npm run build && electron-builder --mac --arm64",
+    "desktop:pack:win": "npm run build && electron-builder --win --x64"
   },
   "dependencies": {
     "@ant-design/icons": "^6.1.0",
@@ -22,9 +27,14 @@
     "@testing-library/jest-dom": "^6.9.1",
     "@testing-library/react": "^16.3.0",
     "@testing-library/user-event": "^14.6.1",
+    "@types/node": "^24.5.2",
     "@types/react": "^19.2.7",
     "@types/react-dom": "^19.2.3",
     "@vitejs/plugin-react": "^5.1.1",
+    "concurrently": "^9.2.1",
+    "cross-env": "^10.0.0",
+    "electron": "^38.1.2",
+    "electron-builder": "^26.0.12",
     "eslint": "^9.39.1",
     "eslint-plugin-react-hooks": "^7.0.1",
     "eslint-plugin-react-refresh": "^0.4.24",
@@ -33,7 +43,44 @@
     "typescript": "~5.9.3",
     "typescript-eslint": "^8.48.1",
     "vite": "^7.2.4",
-    "vitest": "^4.0.15"
+    "vitest": "^4.0.15",
+    "wait-on": "^8.0.4"
+  },
+  "build": {
+    "appId": "com.jingxu.studio",
+    "productName": "镜序工坊",
+    "files": [
+      "dist/**/*",
+      "electron/**/*",
+      "package.json"
+    ],
+    "directories": {
+      "output": "release"
+    },
+    "mac": {
+      "target": [
+        {
+          "target": "dmg",
+          "arch": [
+            "arm64"
+          ]
+        }
+      ],
+      "category": "public.app-category.video"
+    },
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ]
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true
+    }
   }
 }
-
