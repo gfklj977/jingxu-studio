@@ -41,6 +41,6 @@ macOS 构建使用 `npm run desktop:pack:mac`。Windows 必须在 Windows x64 �
 4. 首批仅向内部用户发布；确认项目打开、生产流水线和人工投稿正常后再扩大范围。
 5. 若出现数据损坏、启动失败或生产任务大面积失败，立即撤下当前安装包，恢复上一版本下载入口；用户数据目录保持不动。
 
-自动更新需要稳定的 HTTPS 下载地址或远程发布仓库。配置发布目标之前不要在客户端写死更新地址。
+自动更新使用公开仓库 `gfklj977/jingxu-studio` 的 GitHub Releases。应用启动 10 秒后静默检查；发现新版本后自动下载，下载完成时询问是否重启安装。macOS 自动更新必须使用有效的 Apple Developer ID 签名。
 
 构建完成后运行 `npm run release:checksums`，生成 `release/SHA256SUMS.txt`。对外提供的安装包必须与该文件中的 SHA-256 一致。

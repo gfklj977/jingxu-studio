@@ -24,6 +24,7 @@
     "@ant-design/icons": "^6.1.0",
     "antd": "^6.1.0",
     "dayjs": "^1.11.18",
+    "electron-updater": "^6.8.9",
     "react": "^19.2.0",
     "react-dom": "^19.2.0"
   },
@@ -54,23 +55,45 @@
   "build": {
     "appId": "com.jingxu.studio",
     "productName": "镜序工坊",
-    "artifactName": "${productName}-${version}-${os}-${arch}.${ext}",
+    "artifactName": "jingxu-studio-${version}-${arch}-${os}.${ext}",
     "files": [
       "electron/**/*",
       "package.json"
     ],
     "extraResources": [
-      { "from": "dist", "to": "web" },
-      { "from": "backend-dist", "to": "backend", "filter": ["jingxu-api*"] }
+      {
+        "from": "dist",
+        "to": "web"
+      },
+      {
+        "from": "backend-dist",
+        "to": "backend",
+        "filter": [
+          "jingxu-api*"
+        ]
+      }
     ],
     "directories": {
       "output": "release"
     },
+    "publish": [
+      {
+        "provider": "github",
+        "owner": "gfklj977",
+        "repo": "jingxu-studio"
+      }
+    ],
     "mac": {
       "icon": "build-resources/icon.icns",
       "target": [
         {
           "target": "dmg",
+          "arch": [
+            "arm64"
+          ]
+        },
+        {
+          "target": "zip",
           "arch": [
             "arm64"
           ]

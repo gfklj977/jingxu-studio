@@ -1,4 +1,5 @@
-const { app, BrowserWindow, clipboard, dialog, ipcMain, shell } = require('electron')
+const { app, BrowserWindow, clipboard, dialog, ipcMain, Menu, shell } = require('electron')
+const { autoUpdater } = require('electron-updater')
 const path = require('node:path')
 const http = require('node:http')
 const net = require('node:net')
@@ -8,6 +9,58 @@ const { isAllowedPublishUrl } = require('./security.cjs')
 
 let backendProcess
 let desktopUrl
+
+function installApplicationMenu() {
+  const checkForUpdates = async () => {
+    try {
+      const result = await autoUpdater.checkForUpdates()
+      if (!result?.updateInfo || result.updateInfo.version === app.getVersion()) {
+        await dialog.showMessageBox({ type: 'info', title: '检查更新', message: '当前已是最新版本。' })
+      }
+    } catch (error) {
+      await dialog.showMessageBox({ type: 'error', title: '检查更新失败', message: error instanceof Error ? error.message : String(error) })
+    }
+  }
+  const template = [
+    ...(process.platform === 'darwin' ? [{ label: app.name, submenu: [
+      { role: 'about' },
+      { label: '检查更新…', click: checkForUpdates, enabled: app.isPackaged },
+      { type: 'separator' },
+      { role: 'services' },
+      { type: 'separator' },
+      { role: 'hide' }, { role: 'hideOthers' }, { role: 'unhide' },
+      { type: 'separator' }, { role: 'quit' },
+    ] }] : []),
+    { label: '文件', submenu: [{ role: process.platform === 'darwin' ? 'close' : 'quit' }] },
+    { label: '编辑', submenu: [{ role: 'undo' }, { role: 'redo' }, { type: 'separator' }, { role: 'cut' }, { role: 'copy' }, { role: 'paste' }, { role: 'selectAll' }] },
+    { label: '窗口', submenu: [{ role: 'minimize' }, { role: 'zoom' }, { role: 'front' }] },
+    ...(process.platform === 'darwin' ? [] : [{ label: '帮助', submenu: [
+      { label: '检查更新…', click: checkForUpdates, enabled: app.isPackaged },
+      { label: `关于镜序工坊 ${app.getVersion()}`, enabled: false },
+    ] }]),
+  ]
+  Menu.setApplicationMenu(Menu.buildFromTemplate(template))
+}
+
+function startAutomaticUpdates() {
+  if (!app.isPackaged) return
+  autoUpdater.autoDownload = true
+  autoUpdater.autoInstallOnAppQuit = true
+  autoUpdater.on('error', (error) => console.error('自动更新失败', error))
+  autoUpdater.on('update-downloaded', async ({ version }) => {
+    const result = await dialog.showMessageBox({
+      type: 'info',
+      title: '镜序工坊更新已就绪',
+      message: `新版本 ${version} 已下载完成。`,
+      detail: '现在重启即可完成安装；也可以退出应用时自动安装。',
+      buttons: ['立即重启', '稍后'],
+      defaultId: 0,
+      cancelId: 1,
+    })
+    if (result.response === 0) autoUpdater.quitAndInstall()
+  })
+  setTimeout(() => autoUpdater.checkForUpdates().catch((error) => console.error('自动更新检查失败', error)), 10000)
+}
 
 function getFreePort() {
   return new Promise((resolve, reject) => {
@@ -88,7 +141,9 @@ ipcMain.handle('desktop:showItemInFolder', (_event, filePath) => {
 app.whenReady()
   .then(async () => {
     desktopUrl = process.env.JINGXU_DEV_URL || await startPackagedBackend()
+    installApplicationMenu()
     createWindow(desktopUrl)
+    startAutomaticUpdates()
     app.on('activate', () => { if (BrowserWindow.getAllWindows().length === 0) createWindow(desktopUrl) })
   })
   .catch((error) => {

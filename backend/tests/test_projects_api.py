@@ -288,13 +288,13 @@ def test_provider_secret_rejects_unknown_provider_and_invalid_key(tmp_path):
 def test_provider_connection_uses_stored_secret_without_exposing_it(tmp_path):
     store = FakeSecretStore()
     tester = FakeProviderTester()
-    store.set("deepseek", "sk-private-test-value")
+    store.set("deepseek", "unit-test-secret-value")
     with make_client(tmp_path, store, tester) as client:
         response = client.post("/api/settings/providers/deepseek/test")
 
     assert response.status_code == 200
     assert response.json() == {"status": "VALID", "latencyMs": 42}
-    assert tester.calls == [("deepseek", "sk-private-test-value")]
+    assert tester.calls == [("deepseek", "unit-test-secret-value")]
     assert "sk-private" not in response.text
 
 
