@@ -179,6 +179,18 @@ class ProjectArtifactList(BaseModel):
     data: List[ProjectArtifact]
 
 
+class PublishDraft(BaseModel):
+    platform: str = Field(pattern="^(DOUYIN|XIAOHONGSHU|WECHAT_CHANNELS)$")
+    title: str = Field(max_length=100)
+    body: str = Field(max_length=5000)
+    hashtags: str = Field(max_length=500)
+    checklist: List[str] = Field(max_length=20)
+
+
+class PublishDraftList(BaseModel):
+    data: List[PublishDraft]
+
+
 class Pagination(BaseModel):
     page: int
     pageSize: int

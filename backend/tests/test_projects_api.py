@@ -512,3 +512,20 @@ def test_open_project_folder_creates_directory_and_uses_system_opener(tmp_path):
     assert response.status_code == 204
     assert expected.is_dir()
     assert opened == [expected]
+
+
+def test_generate_edit_and_reload_publish_drafts(tmp_path):
+    with make_client(tmp_path) as client:
+        project = client.post("/api/projects", json={"title": "儿童摄影的情绪价值", "channel": "默认栏目"}).json()
+        client.put(f"/api/projects/{project['id']}/script", json={"content": "照片真正留下的是一家人的情感记忆。"})
+        generated = client.post(f"/api/projects/{project['id']}/publish-drafts/generate")
+        edited = generated.json()["data"][0]
+        edited["title"] = "人工修改后的标题"
+        saved = client.put(f"/api/projects/{project['id']}/publish-drafts/{edited['platform']}", json=edited)
+        loaded = client.get(f"/api/projects/{project['id']}/publish-drafts")
+
+    assert generated.status_code == 200
+    assert [item["platform"] for item in generated.json()["data"]] == ["DOUYIN", "XIAOHONGSHU", "WECHAT_CHANNELS"]
+    assert "#儿童摄影" in generated.json()["data"][0]["hashtags"]
+    assert saved.json()["title"] == "人工修改后的标题"
+    assert loaded.json()["data"][0]["title"] == "人工修改后的标题"

@@ -4,7 +4,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import List, Optional, Tuple
 
-from .schemas import CreateProject, ProductionJob, ProductionJobStage, ProductionSettings, Project, ProjectScript, ProjectStatus, SaveScript, ScriptVersion, UpdateProject
+from .schemas import CreateProject, ProductionJob, ProductionJobStage, ProductionSettings, Project, ProjectScript, ProjectStatus, PublishDraft, PublishDraftList, SaveScript, ScriptVersion, UpdateProject
 
 
 class ProjectNotFound(Exception):
@@ -40,6 +40,7 @@ class ProjectRepository:
             )
             connection.execute("CREATE TABLE IF NOT EXISTS production_settings (project_id INTEGER PRIMARY KEY, payload TEXT NOT NULL, updated_at TEXT NOT NULL, FOREIGN KEY(project_id) REFERENCES projects(id))")
             connection.execute("CREATE TABLE IF NOT EXISTS production_jobs (id INTEGER PRIMARY KEY AUTOINCREMENT, project_id INTEGER NOT NULL, status TEXT NOT NULL, stages TEXT NOT NULL, logs TEXT NOT NULL DEFAULT '[]', created_at TEXT NOT NULL, updated_at TEXT NOT NULL, FOREIGN KEY(project_id) REFERENCES projects(id))")
+            connection.execute("CREATE TABLE IF NOT EXISTS publish_drafts (project_id INTEGER PRIMARY KEY, payload TEXT NOT NULL, updated_at TEXT NOT NULL, FOREIGN KEY(project_id) REFERENCES projects(id))")
             job_columns = {row[1] for row in connection.execute("PRAGMA table_info(production_jobs)")}
             if "logs" not in job_columns:
                 connection.execute("ALTER TABLE production_jobs ADD COLUMN logs TEXT NOT NULL DEFAULT '[]'")
@@ -242,6 +243,36 @@ class ProjectRepository:
         with self._connect() as connection:
             row = connection.execute("SELECT payload FROM production_settings WHERE project_id = ?", (project_id,)).fetchone()
         return ProductionSettings.model_validate_json(row["payload"]) if row else ProductionSettings()
+
+    def get_publish_drafts(self, project_id: int) -> PublishDraftList:
+        self.get(project_id)
+        with self._connect() as connection:
+            row = connection.execute("SELECT payload FROM publish_drafts WHERE project_id = ?", (project_id,)).fetchone()
+        return PublishDraftList(data=[PublishDraft(**item) for item in json.loads(row["payload"])]) if row else PublishDraftList(data=[])
+
+    def generate_publish_drafts(self, project_id: int) -> PublishDraftList:
+        project = self.get(project_id)
+        script = self.get_script(project_id)
+        body = script.content or project.title
+        checklist = ["确认成片画面与声音", "检查标题、正文和话题", "确认账号与可见范围", "人工点击最终发布"]
+        drafts = [
+            PublishDraft(platform="DOUYIN", title=project.title[:30], body=f"{body}\n\n关注镜序工坊，分享更多影像经营与创作思考。", hashtags="#儿童摄影 #摄影行业 #影像创作", checklist=checklist),
+            PublishDraft(platform="XIAOHONGSHU", title=project.title[:20], body=f"{body}\n\n把值得记住的经验，讲给每一位认真经营影像的人。", hashtags="#儿童摄影[话题]# #摄影门店[话题]# #影像创作[话题]#", checklist=checklist),
+            PublishDraft(platform="WECHAT_CHANNELS", title=project.title[:64], body=f"{body}\n\n镜序工坊｜让内容生产更有秩序。", hashtags="#儿童摄影 #摄影经营 #镜序工坊", checklist=checklist),
+        ]
+        with self._connect() as connection:
+            connection.execute("INSERT INTO publish_drafts (project_id, payload, updated_at) VALUES (?, ?, ?) ON CONFLICT(project_id) DO UPDATE SET payload = excluded.payload, updated_at = excluded.updated_at", (project_id, json.dumps([item.model_dump() for item in drafts], ensure_ascii=False), datetime.now(timezone.utc).isoformat()))
+        return PublishDraftList(data=drafts)
+
+    def save_publish_draft(self, project_id: int, draft: PublishDraft) -> PublishDraft:
+        drafts = self.get_publish_drafts(project_id).data
+        by_platform = {item.platform: item for item in drafts}
+        by_platform[draft.platform] = draft
+        order = ["DOUYIN", "XIAOHONGSHU", "WECHAT_CHANNELS"]
+        payload = [by_platform[key].model_dump() for key in order if key in by_platform]
+        with self._connect() as connection:
+            connection.execute("INSERT INTO publish_drafts (project_id, payload, updated_at) VALUES (?, ?, ?) ON CONFLICT(project_id) DO UPDATE SET payload = excluded.payload, updated_at = excluded.updated_at", (project_id, json.dumps(payload, ensure_ascii=False), datetime.now(timezone.utc).isoformat()))
+        return draft
 
     def save_production_settings(self, project_id: int, payload: ProductionSettings) -> ProductionSettings:
         self.get(project_id)

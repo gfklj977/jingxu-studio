@@ -13,7 +13,7 @@ from fastapi.responses import FileResponse, JSONResponse
 from .database import ActiveProductionJob, InvalidProjectOrder, ProjectNotFound, ProjectRepository
 from .providers import HttpProviderTester, ProviderTester
 from .production import PreflightProductionExecutor, ProductionExecutor
-from .schemas import CreateProductionJob, CreateProject, GeneratedScript, GenerateScriptRequest, PaginatedResponse, Pagination, ProductionJob, ProductionSettings, Project, ProjectArtifact, ProjectArtifactList, ProjectOrder, ProjectScript, ProviderCatalog, ProviderSecret, ProviderStatus, ProviderTestResult, ResearchItem, ResearchRequest, ResearchResult, SaveScript, UpdateProject
+from .schemas import CreateProductionJob, CreateProject, GeneratedScript, GenerateScriptRequest, PaginatedResponse, Pagination, ProductionJob, ProductionSettings, Project, ProjectArtifact, ProjectArtifactList, ProjectOrder, ProjectScript, ProviderCatalog, ProviderSecret, ProviderStatus, ProviderTestResult, PublishDraft, PublishDraftList, ResearchItem, ResearchRequest, ResearchResult, SaveScript, UpdateProject
 from .secrets import KeyringSecretStore, SecretStore
 
 
@@ -220,6 +220,20 @@ def create_app(database_path: Path = DEFAULT_DATA_PATH, secret_store: Optional[S
     @app.put("/api/projects/{project_id}/production-settings", response_model=ProductionSettings)
     def save_production_settings(project_id: int, payload: ProductionSettings):
         return repository.save_production_settings(project_id, payload)
+
+    @app.get("/api/projects/{project_id}/publish-drafts", response_model=PublishDraftList)
+    def get_publish_drafts(project_id: int):
+        return repository.get_publish_drafts(project_id)
+
+    @app.post("/api/projects/{project_id}/publish-drafts/generate", response_model=PublishDraftList)
+    def generate_publish_drafts(project_id: int):
+        return repository.generate_publish_drafts(project_id)
+
+    @app.put("/api/projects/{project_id}/publish-drafts/{platform}", response_model=PublishDraft)
+    def save_publish_draft(project_id: int, platform: str, payload: PublishDraft):
+        if platform != payload.platform:
+            raise HTTPException(status_code=409, detail="平台不一致")
+        return repository.save_publish_draft(project_id, payload)
 
     @app.post("/api/projects/{project_id}/production-jobs", response_model=ProductionJob, status_code=201)
     def create_production_job(project_id: int, background_tasks: BackgroundTasks, payload: Optional[CreateProductionJob] = None):

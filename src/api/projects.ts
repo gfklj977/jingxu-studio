@@ -179,3 +179,9 @@ export interface ProjectArtifact { path: string; name: string; kind: ArtifactKin
 export async function listProjectArtifacts(projectId: number): Promise<ProjectArtifact[]> { const response = await fetch(`/api/projects/${projectId}/artifacts`); if (!response.ok) throw new Error('产物加载失败'); return ((await response.json()) as { data: ProjectArtifact[] }).data }
 export function projectArtifactUrl(projectId: number, path: string): string { return `/api/projects/${projectId}/artifacts/${path.split('/').map(encodeURIComponent).join('/')}` }
 export async function openProjectArtifactsFolder(projectId: number): Promise<void> { const response = await fetch(`/api/projects/${projectId}/artifacts/open-folder`, { method: 'POST' }); if (!response.ok) throw new Error('文件夹打开失败') }
+
+export type PublishPlatform = 'DOUYIN' | 'XIAOHONGSHU' | 'WECHAT_CHANNELS'
+export interface PublishDraft { platform: PublishPlatform; title: string; body: string; hashtags: string; checklist: string[] }
+export async function getPublishDrafts(projectId: number): Promise<PublishDraft[]> { const response = await fetch(`/api/projects/${projectId}/publish-drafts`); if (!response.ok) throw new Error('投放草稿加载失败'); return ((await response.json()) as { data: PublishDraft[] }).data }
+export async function generatePublishDrafts(projectId: number): Promise<PublishDraft[]> { const response = await fetch(`/api/projects/${projectId}/publish-drafts/generate`, { method: 'POST' }); if (!response.ok) throw new Error('投放文案生成失败'); return ((await response.json()) as { data: PublishDraft[] }).data }
+export async function savePublishDraft(projectId: number, draft: PublishDraft): Promise<PublishDraft> { const response = await fetch(`/api/projects/${projectId}/publish-drafts/${draft.platform}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(draft) }); if (!response.ok) throw new Error('投放草稿保存失败'); return response.json() as Promise<PublishDraft> }

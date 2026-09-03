@@ -133,6 +133,13 @@ button { font: inherit; }
 .job-status small { color: #64748b; font-weight: 400; }
 @media (max-width: 1100px) { .pipeline-stages { grid-template-columns: repeat(2, 1fr); } }
 .placeholder-view > span { color: #0f766e; font-size: 40px; }
+.publish-grid { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 16px; padding: 22px 24px 28px; }
+.publish-grid article { display: grid; gap: 14px; padding: 18px; border: 1px solid #e2e8f0; border-radius: 12px; background: #fbfcfd; }
+.publish-grid article header, .publish-grid article footer { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.publish-grid article label { display: grid; gap: 7px; color: #334155; font-size: 12px; font-weight: 600; }
+.publish-checklist { display: grid; gap: 7px; }
+.publish-grid article footer { justify-content: flex-end; flex-wrap: wrap; }
+@media (max-width: 1200px) { .publish-grid { grid-template-columns: 1fr; } }
 .placeholder-view h3 { margin: 16px 0 0; color: #0f172a; }
 .placeholder-view p { max-width: 480px; margin: 8px 0 20px; }
 @media (max-width: 900px) { .app-shell { grid-template-columns: 248px minmax(0,1fr); } .sidebar { padding-inline: 14px; } .asset-grid { grid-template-columns: 1fr 1fr; } .asset-card.featured { grid-column: span 2; } }

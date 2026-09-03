@@ -9,9 +9,9 @@ import {
   ReloadOutlined,
   SoundOutlined,
 } from '@ant-design/icons'
-import { Button, Tag, message } from 'antd'
+import { Button, Checkbox, Input, Skeleton, Tag, message } from 'antd'
 import { useCallback, useEffect, useState } from 'react'
-import { createProductionJob, listProjectArtifacts, openProjectArtifactsFolder, projectArtifactUrl, type ArtifactKind, type ProductionStage, type ProjectArtifact } from '../api/projects'
+import { createProductionJob, generatePublishDrafts, getPublishDrafts, listProjectArtifacts, openProjectArtifactsFolder, projectArtifactUrl, savePublishDraft, type ArtifactKind, type ProductionStage, type ProjectArtifact, type PublishDraft, type PublishPlatform } from '../api/projects'
 import type { Project, Stage } from '../types'
 import { ScriptWorkspace } from './ScriptWorkspace'
 import { ProductionWorkspace } from './ProductionWorkspace'
@@ -82,8 +82,25 @@ function AssetMeta({ icon, title, subtitle, url, stage, regenerating, onRegenera
   )
 }
 
-function PublishView() {
-  return <section className="placeholder-view"><CloudUploadOutlined /><h3>辅助投放</h3><p>自动填写抖音、小红书和视频号发布信息，由你检查后手动发布。</p><Button type="primary">准备发布</Button></section>
+const platformInfo: Record<PublishPlatform, { name: string; url: string }> = {
+  DOUYIN: { name: '抖音', url: 'https://creator.douyin.com/' },
+  XIAOHONGSHU: { name: '小红书', url: 'https://creator.xiaohongshu.com/publish/publish?source=official' },
+  WECHAT_CHANNELS: { name: '视频号', url: 'https://channels.weixin.qq.com/platform/post/create' },
+}
+function PublishView({ projectId, enabled }: { projectId: number; enabled: boolean }) {
+  const [drafts, setDrafts] = useState<PublishDraft[]>([])
+  const [loading, setLoading] = useState(enabled)
+  const [busy, setBusy] = useState('')
+  useEffect(() => { if (!enabled) return; let active = true; getPublishDrafts(projectId).then((data) => { if (active) setDrafts(data) }).catch(() => undefined).finally(() => { if (active) setLoading(false) }); return () => { active = false } }, [enabled, projectId])
+  function update(platform: PublishPlatform, changes: Partial<PublishDraft>) { setDrafts((current) => current.map((item) => item.platform === platform ? { ...item, ...changes } : item)) }
+  async function generate() { setBusy('generate'); try { setDrafts(await generatePublishDrafts(projectId)); message.success('三个平台的投放文案已生成') } catch { message.error('生成失败，请先保存项目脚本') } finally { setBusy('') } }
+  async function save(draft: PublishDraft) { setBusy(draft.platform); try { update(draft.platform, await savePublishDraft(projectId, draft)); message.success(`${platformInfo[draft.platform].name}草稿已保存`) } catch { message.error('保存失败') } finally { setBusy('') } }
+  async function copy(draft: PublishDraft) { await navigator.clipboard.writeText(`${draft.title}\n\n${draft.body}\n\n${draft.hashtags}`); message.success('标题、正文和话题已复制') }
+  if (loading) return <section className="content-section script-loading"><Skeleton active /></section>
+  return <section className="content-section publish-workspace">
+    <div className="section-heading"><div><h3>辅助投放</h3><p>自动准备发布信息，检查无误后由你在平台完成发布</p></div><Button type="primary" icon={<CloudUploadOutlined />} loading={busy === 'generate'} onClick={generate}>{drafts.length ? '重新生成文案' : '生成投放文案'}</Button></div>
+    {drafts.length === 0 ? <div className="asset-empty">尚未生成投放草稿。系统会为抖音、小红书和视频号分别适配文案。</div> : <div className="publish-grid">{drafts.map((draft) => <article key={draft.platform}><header><strong>{platformInfo[draft.platform].name}</strong><Tag color="processing">人工发布</Tag></header><label>标题<Input value={draft.title} maxLength={100} showCount onChange={(event) => update(draft.platform, { title: event.target.value })} /></label><label>正文<Input.TextArea value={draft.body} rows={7} onChange={(event) => update(draft.platform, { body: event.target.value })} /></label><label>话题标签<Input.TextArea value={draft.hashtags} rows={2} onChange={(event) => update(draft.platform, { hashtags: event.target.value })} /></label><div className="publish-checklist">{draft.checklist.map((item) => <Checkbox key={item}>{item}</Checkbox>)}</div><footer><Button onClick={() => copy(draft)}>复制全部</Button><Button loading={busy === draft.platform} onClick={() => save(draft)}>保存草稿</Button><Button type="primary" href={platformInfo[draft.platform].url} target="_blank">打开发布页</Button></footer></article>)}</div>}
+  </section>
 }
 
 export function Workspace({ project, stage, onStageChange, resultsEnabled }: WorkspaceProps) {
@@ -99,7 +116,7 @@ export function Workspace({ project, stage, onStageChange, resultsEnabled }: Wor
         {stage === '成片' && <ResultsView key={project.id} projectId={project.id} enabled={resultsEnabled} />}
         {stage === '生产' && <ProductionWorkspace key={project.id} projectId={project.id} />}
         {stage === '脚本' && <ScriptWorkspace key={project.id} projectId={project.id} />}
-        {stage === '投放' && <PublishView />}
+        {stage === '投放' && <PublishView key={project.id} projectId={project.id} enabled={resultsEnabled} />}
       </div>
     </main>
   )
