@@ -24,7 +24,7 @@ describe('镜序工坊工作台', () => {
     const user = userEvent.setup()
     render(<App />)
 
-    await user.click(screen.getByRole('button', { name: /AI 如何重塑摄影门店/ }))
+    await user.click(screen.getByRole('button', { name: 'AI 如何重塑摄影门店，制作中' }))
 
     expect(screen.getByRole('heading', { name: 'AI 如何重塑摄影门店' })).toBeInTheDocument()
   })
@@ -67,7 +67,46 @@ describe('镜序工坊工作台', () => {
 
     await user.type(screen.getByRole('textbox', { name: '搜索项目' }), '儿童摄影')
 
-    expect(screen.getByRole('button', { name: /儿童摄影的情绪价值/ })).toBeInTheDocument()
-    expect(screen.queryByRole('button', { name: /AI 如何重塑摄影门店/ })).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: '儿童摄影的情绪价值，草稿' })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'AI 如何重塑摄影门店，制作中' })).not.toBeInTheDocument()
+  })
+
+  it('通过项目菜单置顶项目', async () => {
+    const user = userEvent.setup()
+    const fetchMock = vi.mocked(fetch)
+    fetchMock
+      .mockResolvedValueOnce({ ok: true, json: async () => ({ data: [], pagination: {} }) } as Response)
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ id: 180, title: 'AI 如何重塑摄影门店', channel: '李逍遥说说', status: 'PRODUCING', isPinned: true, deletedAt: null, createdAt: '2026-09-03T00:00:00Z', updatedAt: '2026-09-03T00:00:00Z' }),
+      } as Response)
+    render(<App />)
+
+    await user.click(screen.getByRole('button', { name: '更多操作：AI 如何重塑摄影门店' }))
+    await user.click(await screen.findByRole('menuitem', { name: /置顶项目/ }))
+
+    expect(fetchMock).toHaveBeenLastCalledWith('/api/projects/180', expect.objectContaining({ method: 'PATCH' }))
+    expect(screen.getByLabelText('已置顶：AI 如何重塑摄影门店')).toBeInTheDocument()
+  })
+
+  it('从回收站恢复项目', async () => {
+    const user = userEvent.setup()
+    const fetchMock = vi.mocked(fetch)
+    fetchMock
+      .mockResolvedValueOnce({ ok: true, json: async () => ({ data: [], pagination: {} }) } as Response)
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ data: [{ id: 301, title: '被删除项目', channel: '默认栏目', status: 'DRAFT', isPinned: false, deletedAt: '2026-09-03T00:00:00Z', createdAt: '2026-09-03T00:00:00Z', updatedAt: '2026-09-03T00:00:00Z' }], pagination: {} }),
+      } as Response)
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ id: 301, title: '被删除项目', channel: '默认栏目', status: 'DRAFT', isPinned: false, deletedAt: null, createdAt: '2026-09-03T00:00:00Z', updatedAt: '2026-09-03T00:00:00Z' }),
+      } as Response)
+    render(<App />)
+
+    await user.click(screen.getByRole('button', { name: /回收站/ }))
+    await user.click(await screen.findByRole('button', { name: '恢复：被删除项目' }))
+
+    expect(await screen.findByRole('button', { name: /被删除项目，草稿/ })).toBeInTheDocument()
   })
 })

@@ -6,5 +6,5 @@ export interface Project {
   channel: string
   updatedAt: string
   status: '已完成' | '制作中' | '草稿'
+  isPinned?: boolean
 }
-

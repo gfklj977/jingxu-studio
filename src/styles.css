@@ -23,16 +23,22 @@ button { font: inherit; }
 .project-block { min-height: 0; flex: 1; }
 .project-list { display: grid; gap: 4px; }
 .project-empty { margin: 18px 8px; color: #94a3b8; font-size: 12px; text-align: center; }
-.project-item { display: flex; align-items: center; gap: 10px; padding: 10px; border-radius: 8px; background: transparent; color: #334155; }
-.project-item:hover { background: #f8fafc; }
-.project-item.selected { color: #0f766e; background: #e9f7f4; }
+.project-row { display: grid; grid-template-columns: minmax(0,1fr) 28px; align-items: center; border-radius: 8px; }
+.project-row.selected { color: #0f766e; background: #e9f7f4; }
+.project-item { display: flex; align-items: center; gap: 10px; min-width: 0; padding: 10px; border-radius: 8px; background: transparent; color: #334155; }
+.project-row:hover { background: #f8fafc; }
+.project-row.selected .project-item { color: #0f766e; }
+.project-more { opacity: 0; padding: 5px; border: 0; color: #64748b; background: transparent; cursor: pointer; }
+.project-row:hover .project-more, .project-more:focus-visible { opacity: 1; }
+.project-pin { margin-left: auto; color: #f59e0b; font-size: 10px; }
 .project-icon { display: grid; place-items: center; width: 32px; height: 32px; border-radius: 8px; background: #f1f5f9; font-size: 15px; }
-.project-item.selected .project-icon { background: #d5f0ea; }
+.project-row.selected .project-icon { background: #d5f0ea; }
 .project-copy { min-width: 0; }
 .project-copy strong { overflow: hidden; font-size: 13px; text-overflow: ellipsis; white-space: nowrap; }
 .sidebar-footer { display: flex; justify-content: space-between; align-items: center; border-top: 1px solid #edf0f2; padding-top: 12px; }
 .local-badge { color: #64748b; font-size: 11px; }
 .local-badge i { display: inline-block; width: 7px; height: 7px; margin-right: 6px; border-radius: 50%; background: #10b981; }
+.trash-icon { color: #94a3b8; }
 .workspace { min-width: 0; height: 100vh; overflow: auto; }
 .workspace-header { position: sticky; top: 0; z-index: 5; padding: 21px 32px 0; background: rgba(255,255,255,.96); border-bottom: 1px solid #e5e7eb; backdrop-filter: blur(12px); }
 .project-title { display: flex; justify-content: space-between; align-items: center; }

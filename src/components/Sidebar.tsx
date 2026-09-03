@@ -1,11 +1,14 @@
 import {
   FolderOpenOutlined,
+  DeleteOutlined,
+  EditOutlined,
+  MoreOutlined,
   PlusOutlined,
   SearchOutlined,
   SettingOutlined,
   StarFilled,
 } from '@ant-design/icons'
-import { Button, Input, Tooltip } from 'antd'
+import { Button, Dropdown, Input, Tooltip } from 'antd'
 import type { Project } from '../types'
 
 interface SidebarProps {
@@ -15,9 +18,13 @@ interface SidebarProps {
   onCreate: () => void
   searchValue: string
   onSearchChange: (value: string) => void
+  onRename: (project: Project) => void
+  onTogglePin: (project: Project) => void
+  onTrash: (project: Project) => void
+  onOpenTrash: () => void
 }
 
-export function Sidebar({ projects, selectedId, onSelect, onCreate, searchValue, onSearchChange }: SidebarProps) {
+export function Sidebar({ projects, selectedId, onSelect, onCreate, searchValue, onSearchChange, onRename, onTogglePin, onTrash, onOpenTrash }: SidebarProps) {
   return (
     <aside className="sidebar" aria-label="项目侧栏">
       <header className="brand">
@@ -48,27 +55,25 @@ export function Sidebar({ projects, selectedId, onSelect, onCreate, searchValue,
       <section className="project-block" aria-labelledby="project-title">
         <div className="section-label" id="project-title"><span>最近项目</span><small>{projects.length}</small></div>
         <div className="project-list">
-          {projects.map((project) => (
-            <button
-              key={project.id}
-              className={`project-item ${project.id === selectedId ? 'selected' : ''}`}
-              aria-pressed={project.id === selectedId}
-              aria-label={`${project.title}，${project.status}`}
-              onClick={() => onSelect(project.id)}
-            >
+          {projects.map((project) => <div className={`project-row ${project.id === selectedId ? 'selected' : ''}`} key={project.id}>
+            <button className="project-item" aria-pressed={project.id === selectedId} aria-label={`${project.title}，${project.status}`} onClick={() => onSelect(project.id)}>
               <span className="project-icon"><FolderOpenOutlined /></span>
-              <span className="project-copy">
-                <strong>{project.title}</strong>
-                <small>{project.updatedAt} · {project.status}</small>
-              </span>
+              <span className="project-copy"><strong>{project.title}</strong><small>{project.updatedAt} · {project.status}</small></span>
+              {project.isPinned && <StarFilled className="project-pin" aria-label={`已置顶：${project.title}`} />}
             </button>
-          ))}
+            <Dropdown trigger={['click']} menu={{ items: [
+              { key: 'rename', label: '重命名', icon: <EditOutlined />, onClick: () => onRename(project) },
+              { key: 'pin', label: project.isPinned ? '取消置顶' : '置顶项目', icon: <StarFilled />, onClick: () => onTogglePin(project) },
+              { type: 'divider' },
+              { key: 'trash', label: '移入回收站', danger: true, icon: <DeleteOutlined />, onClick: () => onTrash(project) },
+            ] }}><button className="project-more" aria-label={`更多操作：${project.title}`}><MoreOutlined /></button></Dropdown>
+          </div>)}
           {projects.length === 0 && <p className="project-empty">没有匹配的项目</p>}
         </div>
       </section>
 
       <footer className="sidebar-footer">
-        <Tooltip title="全局设置"><Button type="text" icon={<SettingOutlined />}>设置</Button></Tooltip>
+        <div><Tooltip title="全局设置"><Button type="text" icon={<SettingOutlined />}>设置</Button></Tooltip><Button type="text" icon={<DeleteOutlined />} onClick={onOpenTrash}>回收站</Button></div>
         <span className="local-badge"><i />本地运行</span>
       </footer>
     </aside>
