@@ -125,6 +125,24 @@ class GeneratedScript(BaseModel):
     content: str = Field(max_length=50000)
 
 
+class ProductionStage(str, Enum):
+    AUDIO = "AUDIO"
+    SUBTITLES = "SUBTITLES"
+    STORYBOARD = "STORYBOARD"
+    COVER = "COVER"
+    VIDEO = "VIDEO"
+
+
+class ProductionSettings(BaseModel):
+    stages: List[ProductionStage] = [ProductionStage.AUDIO, ProductionStage.SUBTITLES, ProductionStage.STORYBOARD, ProductionStage.COVER, ProductionStage.VIDEO]
+    resolution: str = Field(default="1920x1080", pattern="^(1920x1080)$")
+    fps: int = Field(default=30, ge=24, le=60)
+    videoCodec: str = Field(default="H264", pattern="^H264$")
+    audioCodec: str = Field(default="AAC", pattern="^AAC$")
+    voiceVolume: float = Field(default=1.3, ge=0, le=2)
+    bgmVolume: float = Field(default=0.09, ge=0, le=1)
+
+
 class Pagination(BaseModel):
     page: int
     pageSize: int

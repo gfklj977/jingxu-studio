@@ -3,7 +3,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import List, Optional, Tuple
 
-from .schemas import CreateProject, Project, ProjectScript, ProjectStatus, SaveScript, ScriptVersion, UpdateProject
+from .schemas import CreateProject, ProductionSettings, Project, ProjectScript, ProjectStatus, SaveScript, ScriptVersion, UpdateProject
 
 
 class ProjectNotFound(Exception):
@@ -33,6 +33,7 @@ class ProjectRepository:
                 )
                 """
             )
+            connection.execute("CREATE TABLE IF NOT EXISTS production_settings (project_id INTEGER PRIMARY KEY, payload TEXT NOT NULL, updated_at TEXT NOT NULL, FOREIGN KEY(project_id) REFERENCES projects(id))")
             columns = {row[1] for row in connection.execute("PRAGMA table_info(projects)")}
             migrations = {
                 "is_pinned": "ALTER TABLE projects ADD COLUMN is_pinned INTEGER NOT NULL DEFAULT 0",
@@ -226,6 +227,18 @@ class ProjectRepository:
                     (project_id, payload.content, now),
                 )
         return self.get_script(project_id)
+
+    def get_production_settings(self, project_id: int) -> ProductionSettings:
+        self.get(project_id)
+        with self._connect() as connection:
+            row = connection.execute("SELECT payload FROM production_settings WHERE project_id = ?", (project_id,)).fetchone()
+        return ProductionSettings.model_validate_json(row["payload"]) if row else ProductionSettings()
+
+    def save_production_settings(self, project_id: int, payload: ProductionSettings) -> ProductionSettings:
+        self.get(project_id)
+        with self._connect() as connection:
+            connection.execute("INSERT INTO production_settings (project_id, payload, updated_at) VALUES (?, ?, ?) ON CONFLICT(project_id) DO UPDATE SET payload = excluded.payload, updated_at = excluded.updated_at", (project_id, payload.model_dump_json(), datetime.now(timezone.utc).isoformat()))
+        return payload
 
     def _connect(self) -> sqlite3.Connection:
         connection = sqlite3.connect(self.database_path)

@@ -291,3 +291,18 @@ def test_research_requires_existing_project_and_configured_provider(tmp_path):
 
     assert missing_project.status_code == 404
     assert missing_key.status_code == 409
+
+
+def test_production_settings_have_reference_defaults_and_persist(tmp_path):
+    with make_client(tmp_path) as client:
+        project = client.post("/api/projects", json={"title": "生产配置", "channel": "默认栏目"}).json()
+        defaults = client.get(f"/api/projects/{project['id']}/production-settings")
+        updated = client.put(f"/api/projects/{project['id']}/production-settings", json={
+            "stages": ["AUDIO", "SUBTITLES", "VIDEO"], "resolution": "1920x1080", "fps": 30,
+            "videoCodec": "H264", "audioCodec": "AAC", "voiceVolume": 1.3, "bgmVolume": 0.09,
+        })
+
+    assert defaults.status_code == 200
+    assert defaults.json()["stages"] == ["AUDIO", "SUBTITLES", "STORYBOARD", "COVER", "VIDEO"]
+    assert updated.status_code == 200
+    assert updated.json()["voiceVolume"] == 1.3

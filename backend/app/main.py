@@ -10,7 +10,7 @@ from fastapi.responses import JSONResponse
 
 from .database import InvalidProjectOrder, ProjectNotFound, ProjectRepository
 from .providers import HttpProviderTester, ProviderTester
-from .schemas import CreateProject, GeneratedScript, GenerateScriptRequest, PaginatedResponse, Pagination, Project, ProjectOrder, ProjectScript, ProviderCatalog, ProviderSecret, ProviderStatus, ProviderTestResult, ResearchItem, ResearchRequest, ResearchResult, SaveScript, UpdateProject
+from .schemas import CreateProject, GeneratedScript, GenerateScriptRequest, PaginatedResponse, Pagination, ProductionSettings, Project, ProjectOrder, ProjectScript, ProviderCatalog, ProviderSecret, ProviderStatus, ProviderTestResult, ResearchItem, ResearchRequest, ResearchResult, SaveScript, UpdateProject
 from .secrets import KeyringSecretStore, SecretStore
 
 
@@ -198,6 +198,14 @@ def create_app(database_path: Path = DEFAULT_DATA_PATH, secret_store: Optional[S
             return GeneratedScript(content=tester.generate(api_key, payload.topic, payload.brief, payload.researchNotes))
         except (httpx.HTTPError, ValueError):
             return JSONResponse(status_code=502, content={"error": {"code": "GENERATION_FAILED", "message": "脚本生成失败"}})
+
+    @app.get("/api/projects/{project_id}/production-settings", response_model=ProductionSettings)
+    def get_production_settings(project_id: int):
+        return repository.get_production_settings(project_id)
+
+    @app.put("/api/projects/{project_id}/production-settings", response_model=ProductionSettings)
+    def save_production_settings(project_id: int, payload: ProductionSettings):
+        return repository.save_production_settings(project_id, payload)
 
     return app
 
