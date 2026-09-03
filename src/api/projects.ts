@@ -136,3 +136,18 @@ export async function testProvider(providerId: string): Promise<{ status: 'VALID
   if (!response.ok) throw new Error('连接检测失败')
   return response.json() as Promise<{ status: 'VALID'; latencyMs: number }>
 }
+
+export interface ResearchItem { title: string; url: string; content: string }
+
+export async function researchProject(projectId: number, query: string): Promise<ResearchItem[]> {
+  const response = await fetch(`/api/projects/${projectId}/research`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ query }) })
+  if (!response.ok) throw new Error('联网搜索失败')
+  return ((await response.json()) as { data: ResearchItem[] }).data
+}
+
+export async function generateProjectScript(projectId: number, input: { topic: string; brief: string; researchNotes: string }): Promise<string> {
+  const { topic, brief, researchNotes } = input
+  const response = await fetch(`/api/projects/${projectId}/script/generate`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ topic, brief, researchNotes }) })
+  if (!response.ok) throw new Error('脚本生成失败')
+  return ((await response.json()) as { content: string }).content
+}

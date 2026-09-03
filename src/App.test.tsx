@@ -202,4 +202,23 @@ describe('镜序工坊工作台', () => {
     expect(fetchMock).toHaveBeenLastCalledWith('/api/settings/providers/deepseek/test', { method: 'POST' })
     expect(await screen.findByText('42 ms')).toBeInTheDocument()
   })
+
+  it('搜索资料并生成脚本初稿', async () => {
+    const user = userEvent.setup()
+    const fetchMock = vi.mocked(fetch)
+    fetchMock
+      .mockResolvedValueOnce({ ok: true, json: async () => ({ data: [], pagination: {} }) } as Response)
+      .mockResolvedValueOnce({ ok: true, json: async () => ({ projectId: 181, topic: '', brief: '', researchNotes: '', content: '', updatedAt: '', versions: [] }) } as Response)
+      .mockResolvedValueOnce({ ok: true, json: async () => ({ data: [{ title: '资料一', url: 'https://example.com/a', content: '关键结论' }] }) } as Response)
+      .mockResolvedValueOnce({ ok: true, json: async () => ({ content: '生成的口播脚本' }) } as Response)
+    render(<App />)
+
+    await user.click(screen.getByRole('tab', { name: '脚本' }))
+    await user.type(await screen.findByLabelText('选题'), 'AI 摄影')
+    await user.click(screen.getByRole('button', { name: /联网搜索/ }))
+    expect(await screen.findByDisplayValue(/https:\/\/example.com\/a/)).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: /AI 生成脚本/ }))
+    expect(await screen.findByDisplayValue('生成的口播脚本')).toBeInTheDocument()
+    expect(fetchMock).toHaveBeenLastCalledWith('/api/projects/181/script/generate', expect.objectContaining({ method: 'POST' }))
+  })
 })

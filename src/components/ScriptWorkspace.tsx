@@ -1,7 +1,7 @@
 import { BulbOutlined, ClockCircleOutlined, FileSearchOutlined, SaveOutlined } from '@ant-design/icons'
-import { Alert, Button, Input, Skeleton, Tooltip, message } from 'antd'
+import { Alert, Button, Input, Skeleton, message } from 'antd'
 import { useEffect, useState } from 'react'
-import { getProjectScript, saveProjectScript, type ProjectScript } from '../api/projects'
+import { generateProjectScript, getProjectScript, researchProject, saveProjectScript, type ProjectScript } from '../api/projects'
 
 const emptyScript: ProjectScript = { projectId: 0, topic: '', brief: '', researchNotes: '', content: '', updatedAt: '', versions: [] }
 
@@ -10,6 +10,8 @@ export function ScriptWorkspace({ projectId }: { projectId: number }) {
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
+  const [searching, setSearching] = useState(false)
+  const [generating, setGenerating] = useState(false)
 
   useEffect(() => {
     let active = true
@@ -38,6 +40,24 @@ export function ScriptWorkspace({ projectId }: { projectId: number }) {
     }
   }
 
+  async function research() {
+    if (script.topic.trim().length < 2) return
+    setSearching(true); setError('')
+    try {
+      const results = await researchProject(projectId, script.topic)
+      update('researchNotes', results.map((item, index) => `[${index + 1}] ${item.title}\n${item.url}\n${item.content}`).join('\n\n'))
+    } catch { setError('联网搜索失败，请先在设置中配置并测试 Tavily。') }
+    finally { setSearching(false) }
+  }
+
+  async function generate() {
+    if (!script.topic.trim()) return
+    setGenerating(true); setError('')
+    try { update('content', await generateProjectScript(projectId, script)) }
+    catch { setError('脚本生成失败，请先在设置中配置并测试 DeepSeek。') }
+    finally { setGenerating(false) }
+  }
+
   if (loading) return <section className="content-section script-loading" aria-label="正在加载脚本"><Skeleton active paragraph={{ rows: 8 }} /></section>
 
   return <section className="script-workspace" aria-label="脚本工作区">
@@ -52,8 +72,8 @@ export function ScriptWorkspace({ projectId }: { projectId: number }) {
         <label><span>创作简报 <small>{script.brief.length}/4000</small></span><Input.TextArea aria-label="创作简报" maxLength={4000} rows={3} value={script.brief} onChange={(event) => update('brief', event.target.value)} placeholder="目标观众、核心观点、时长、口吻和行动号召" /></label>
         <label><span>资料摘要 <small>{script.researchNotes.length}/20000</small></span><Input.TextArea aria-label="资料摘要" maxLength={20000} rows={5} value={script.researchNotes} onChange={(event) => update('researchNotes', event.target.value)} placeholder="粘贴来源、关键事实和可引用观点" /></label>
         <div className="script-tools">
-          <Tooltip title="配置搜索服务后启用"><Button icon={<FileSearchOutlined />} disabled>联网搜索</Button></Tooltip>
-          <Tooltip title="配置文本模型后启用"><Button icon={<BulbOutlined />} disabled>AI 生成脚本</Button></Tooltip>
+          <Button icon={<FileSearchOutlined />} loading={searching} disabled={script.topic.trim().length < 2} onClick={research}>联网搜索</Button>
+          <Button icon={<BulbOutlined />} loading={generating} disabled={!script.topic.trim()} onClick={generate}>AI 生成脚本</Button>
         </div>
         <label><span>脚本正文 <small>{script.content.length}/50000</small></span><Input.TextArea aria-label="脚本正文" maxLength={50000} rows={14} value={script.content} onChange={(event) => update('content', event.target.value)} placeholder="在这里编辑口播脚本……" /></label>
       </div>
