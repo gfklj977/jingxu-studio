@@ -12,9 +12,10 @@ interface SidebarProps {
   projects: Project[]
   selectedId: number
   onSelect: (id: number) => void
+  onCreate: () => void
 }
 
-export function Sidebar({ projects, selectedId, onSelect }: SidebarProps) {
+export function Sidebar({ projects, selectedId, onSelect, onCreate }: SidebarProps) {
   return (
     <aside className="sidebar" aria-label="项目侧栏">
       <header className="brand">
@@ -25,7 +26,7 @@ export function Sidebar({ projects, selectedId, onSelect }: SidebarProps) {
         </div>
       </header>
 
-      <Button type="primary" size="large" icon={<PlusOutlined />} block className="create-button">
+      <Button type="primary" size="large" icon={<PlusOutlined />} block className="create-button" onClick={onCreate}>
         新建创作项目
       </Button>
 
@@ -70,4 +71,3 @@ export function Sidebar({ projects, selectedId, onSelect }: SidebarProps) {
     </aside>
   )
 }
-
