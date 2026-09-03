@@ -21,7 +21,8 @@
     "release:checksums": "node scripts/checksum-release.cjs",
     "release:verify": "node scripts/verify-release.cjs",
     "release:smoke": "node scripts/smoke-packaged-backend.cjs",
-    "test:release": "node --test scripts/verify-release.node-test.cjs scripts/smoke-packaged-backend.node-test.cjs"
+    "release:smoke-desktop": "node scripts/smoke-packaged-desktop.cjs",
+    "test:release": "node --test scripts/verify-release.node-test.cjs scripts/smoke-packaged-backend.node-test.cjs scripts/smoke-packaged-desktop.node-test.cjs"
   },
   "dependencies": {
     "@ant-design/icons": "^6.1.0",

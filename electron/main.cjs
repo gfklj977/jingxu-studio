@@ -6,6 +6,7 @@ const net = require('node:net')
 const { spawn } = require('node:child_process')
 
 const { isAllowedPublishUrl } = require('./security.cjs')
+const { attachDesktopSmokeTest } = require('./smoke.cjs')
 
 let backendProcess
 let desktopUrl
@@ -96,6 +97,7 @@ async function startPackagedBackend() {
 }
 
 function createWindow(appUrl) {
+  const smokeMode = process.env.JINGXU_DESKTOP_SMOKE === '1'
   const allowedOrigin = new URL(appUrl).origin
   const window = new BrowserWindow({
     width: 1440,
@@ -104,6 +106,7 @@ function createWindow(appUrl) {
     minHeight: 720,
     title: '镜序工坊',
     backgroundColor: '#f6f8fa',
+    show: !smokeMode,
     webPreferences: {
       preload: path.join(__dirname, 'preload.cjs'),
       contextIsolation: true,
@@ -122,7 +125,16 @@ function createWindow(appUrl) {
       event.preventDefault()
     }
   })
+  if (smokeMode) {
+    attachDesktopSmokeTest({
+      window,
+      report: (result) => console.log(`JINGXU_DESKTOP_SMOKE_OK ${JSON.stringify(result)}`),
+      quit: () => app.quit(),
+      fail: (error) => { console.error('JINGXU_DESKTOP_SMOKE_FAILED', error); app.exit(1) },
+    })
+  }
   window.loadURL(appUrl)
+  return window
 }
 
 ipcMain.handle('desktop:copyText', (_event, text) => {
