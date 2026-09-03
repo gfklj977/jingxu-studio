@@ -35,6 +35,7 @@ jobs:
       - run: npm run release:check
       - run: npm run lint
       - run: npm test -- --run
+      - run: npm run test:release
       - run: PYTHONPATH=backend .venv/bin/pytest -q backend/tests
       - run: npm audit --omit=dev --audit-level=high
       - run: npm run build
@@ -91,6 +92,7 @@ jobs:
         env:
           CSC_IDENTITY_AUTO_DISCOVERY: "false"
       - run: npm run release:checksums
+      - run: npm run release:verify
       - uses: actions/upload-artifact@v4
         with:
           name: jingxu-${{ runner.os }}

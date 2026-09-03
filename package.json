@@ -18,7 +18,9 @@
     "desktop:pack:mac": "npm run build && npm run backend:pack && electron-builder --mac --arm64 --publish never --config.electronDist=node_modules/electron/dist",
     "desktop:pack:win": "npm run build && npm run backend:pack && electron-builder --win --x64 --publish never --config.electronDist=node_modules/electron/dist",
     "release:check": "node scripts/release-check.cjs",
-    "release:checksums": "node scripts/checksum-release.cjs"
+    "release:checksums": "node scripts/checksum-release.cjs",
+    "release:verify": "node scripts/verify-release.cjs",
+    "test:release": "node --test scripts/verify-release.node-test.cjs"
   },
   "dependencies": {
     "@ant-design/icons": "^6.1.0",
