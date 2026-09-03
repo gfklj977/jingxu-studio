@@ -14,6 +14,7 @@ import {
 import { Button, Tag } from 'antd'
 import type { Project, Stage } from '../types'
 import { ScriptWorkspace } from './ScriptWorkspace'
+import { ProductionWorkspace } from './ProductionWorkspace'
 
 const stages: Stage[] = ['脚本', '生产', '成片', '投放']
 
@@ -68,10 +69,6 @@ function AssetMeta({ icon, title, subtitle }: { icon: React.ReactNode; title: st
   )
 }
 
-function PipelineView() {
-  return <section className="placeholder-view"><CloudUploadOutlined /><h3>生产流水线</h3><p>上传素材并依次生成配音、字幕、场景图、封面和视频。</p><Button type="primary">开始生产</Button></section>
-}
-
 function PublishView() {
   return <section className="placeholder-view"><CloudUploadOutlined /><h3>辅助投放</h3><p>自动填写抖音、小红书和视频号发布信息，由你检查后手动发布。</p><Button type="primary">准备发布</Button></section>
 }
@@ -87,7 +84,7 @@ export function Workspace({ project, stage, onStageChange }: WorkspaceProps) {
       </header>
       <div className="workspace-body">
         {stage === '成片' && <ResultsView />}
-        {stage === '生产' && <PipelineView />}
+        {stage === '生产' && <ProductionWorkspace key={project.id} projectId={project.id} />}
         {stage === '脚本' && <ScriptWorkspace key={project.id} projectId={project.id} />}
         {stage === '投放' && <PublishView />}
       </div>

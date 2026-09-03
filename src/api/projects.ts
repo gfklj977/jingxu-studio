@@ -151,3 +151,20 @@ export async function generateProjectScript(projectId: number, input: { topic: s
   if (!response.ok) throw new Error('脚本生成失败')
   return ((await response.json()) as { content: string }).content
 }
+
+export type ProductionStage = 'AUDIO' | 'SUBTITLES' | 'STORYBOARD' | 'COVER' | 'VIDEO'
+export interface ProductionSettings { stages: ProductionStage[]; resolution: string; fps: number; videoCodec: string; audioCodec: string; voiceVolume: number; bgmVolume: number }
+
+export async function getProductionSettings(projectId: number): Promise<ProductionSettings> {
+  const response = await fetch(`/api/projects/${projectId}/production-settings`)
+  if (!response.ok) throw new Error('生产设置加载失败')
+  const value = await response.json() as Partial<ProductionSettings>
+  if (!Array.isArray(value.stages)) throw new Error('生产设置格式错误')
+  return value as ProductionSettings
+}
+
+export async function saveProductionSettings(projectId: number, settings: ProductionSettings): Promise<ProductionSettings> {
+  const response = await fetch(`/api/projects/${projectId}/production-settings`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(settings) })
+  if (!response.ok) throw new Error('生产设置保存失败')
+  return response.json() as Promise<ProductionSettings>
+}

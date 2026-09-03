@@ -112,6 +112,17 @@ button { font: inherit; }
 .provider-actions { display: flex !important; grid-auto-flow: column; align-items: center; gap: 6px !important; }
 .provider-list article.editing { grid-template-columns: 38px 1fr auto; }
 .provider-editor { grid-column: 2 / -1; display: flex !important; flex-direction: row; gap: 8px !important; padding-top: 4px; }
+.production-workspace { padding-bottom: 24px; }
+.production-workspace > .ant-alert { margin: 18px 24px; }
+.pipeline-stages { display: grid; grid-template-columns: repeat(5, 1fr); gap: 10px; padding: 24px; }
+.pipeline-stages label { display: grid; gap: 10px; padding: 16px; border: 1px solid #e2e8f0; border-radius: 10px; }
+.pipeline-stages label > span:first-child { display: grid; place-items: center; width: 26px; height: 26px; border-radius: 50%; color: white; background: #0f766e; }
+.pipeline-stages small { color: #94a3b8; }
+.production-standard { margin: 0 24px; padding: 18px; border-radius: 10px; background: #f8fafc; }
+.production-standard h4 { margin: 0 0 10px; }
+.production-standard p { margin: 10px 0 0; color: #64748b; }
+.pipeline-start { margin: 0 24px; }
+@media (max-width: 1100px) { .pipeline-stages { grid-template-columns: repeat(2, 1fr); } }
 .placeholder-view > span { color: #0f766e; font-size: 40px; }
 .placeholder-view h3 { margin: 16px 0 0; color: #0f172a; }
 .placeholder-view p { max-width: 480px; margin: 8px 0 20px; }

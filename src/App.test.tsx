@@ -36,7 +36,7 @@ describe('镜序工坊工作台', () => {
     await user.click(screen.getByRole('tab', { name: '生产' }))
 
     expect(screen.getByRole('tab', { name: '生产' })).toHaveAttribute('aria-selected', 'true')
-    expect(screen.getByText('生产流水线')).toBeInTheDocument()
+    expect(await screen.findByText('生产设置加载失败')).toBeInTheDocument()
   })
 
   it('新建项目后将服务器返回的项目加入侧栏并选中', async () => {
@@ -220,5 +220,18 @@ describe('镜序工坊工作台', () => {
     await user.click(screen.getByRole('button', { name: /AI 生成脚本/ }))
     expect(await screen.findByDisplayValue('生成的口播脚本')).toBeInTheDocument()
     expect(fetchMock).toHaveBeenLastCalledWith('/api/projects/181/script/generate', expect.objectContaining({ method: 'POST' }))
+  })
+
+  it('展示并保存生产流水线配置', async () => {
+    const user = userEvent.setup()
+    const settings = { stages: ['AUDIO', 'SUBTITLES', 'STORYBOARD', 'COVER', 'VIDEO'], resolution: '1920x1080', fps: 30, videoCodec: 'H264', audioCodec: 'AAC', voiceVolume: 1.3, bgmVolume: 0.09 }
+    const fetchMock = vi.mocked(fetch)
+    fetchMock.mockResolvedValueOnce({ ok: true, json: async () => ({ data: [], pagination: {} }) } as Response).mockResolvedValueOnce({ ok: true, json: async () => settings } as Response).mockResolvedValueOnce({ ok: true, json: async () => settings } as Response)
+    render(<App />)
+
+    await user.click(screen.getByRole('tab', { name: '生产' }))
+    expect(await screen.findByText('1920×1080')).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: /保存生产设置/ }))
+    expect(fetchMock).toHaveBeenLastCalledWith('/api/projects/181/production-settings', expect.objectContaining({ method: 'PUT' }))
   })
 })
