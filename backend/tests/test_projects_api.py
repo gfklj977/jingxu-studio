@@ -419,3 +419,23 @@ def test_storyboard_stage_splits_script_and_saves_images_and_manifest(tmp_path):
     assert (storyboard_dir / "scene-002.png").exists()
     manifest = json.loads((storyboard_dir / "manifest.json").read_text())
     assert [item["sourceText"] for item in manifest["scenes"]] == ["孩子跑进阳光下的花园。", "妈妈蹲下拥抱孩子！"]
+
+
+def test_cover_stage_generates_branded_safe_svg(tmp_path):
+    secret_store = FakeSecretStore()
+    secret_store.set("seedream", "ark-key")
+    executor = PreflightProductionExecutor(image_generator=FakeImageGenerator())
+    with make_client(tmp_path, secret_store=secret_store, production_executor=executor) as client:
+        project = client.post("/api/projects", json={"title": "成长 & 陪伴", "channel": "默认栏目"}).json()
+        client.put(f"/api/projects/{project['id']}/script", json={"content": "记录孩子成长中值得珍藏的瞬间。"})
+        client.put(f"/api/projects/{project['id']}/production-settings", json={"stages": ["COVER"]})
+        client.post(f"/api/projects/{project['id']}/production-jobs")
+        loaded = client.get(f"/api/projects/{project['id']}/production-jobs/latest")
+
+    assert loaded.json()["status"] == "COMPLETED"
+    cover_dir = tmp_path / "projects" / str(project["id"]) / "cover"
+    assert (cover_dir / "background.png").exists()
+    svg = (cover_dir / "cover.svg").read_text()
+    assert "成长 &amp; 陪伴" in svg
+    assert "镜序工坊" in svg
+    assert "viewBox=\"0 0 1920 1080\"" in svg

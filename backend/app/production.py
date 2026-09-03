@@ -2,6 +2,7 @@ import base64
 import json
 import re
 import uuid
+from html import escape
 from typing import Optional, Protocol
 
 import httpx
@@ -97,6 +98,20 @@ def build_storyboard(script: str, count: int) -> list[dict]:
     return [{"index": index, "sourceText": text, "prompt": f"电影感纪实摄影，16:9横构图，自然光，人物一致，真实细节，无文字无水印。画面内容：{text}"} for index, text in enumerate(scenes, 1)]
 
 
+def build_cover_svg(title: str, background: bytes) -> str:
+    safe_title = escape(title)
+    encoded = base64.b64encode(background).decode("ascii")
+    return f'''<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1920 1080" width="1920" height="1080">
+  <image href="data:image/png;base64,{encoded}" width="1920" height="1080" preserveAspectRatio="xMidYMid slice"/>
+  <rect width="1920" height="1080" fill="url(#shade)"/>
+  <defs><linearGradient id="shade" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#07111F" stop-opacity=".9"/><stop offset=".72" stop-color="#07111F" stop-opacity=".12"/></linearGradient></defs>
+  <rect x="120" y="186" width="10" height="120" rx="5" fill="#F3B640"/>
+  <text x="168" y="280" fill="#FFFFFF" font-family="PingFang SC, Microsoft YaHei, sans-serif" font-size="96" font-weight="700">{safe_title}</text>
+  <text x="168" y="870" fill="#F3B640" font-family="PingFang SC, Microsoft YaHei, sans-serif" font-size="34" font-weight="600" letter-spacing="8">镜序工坊</text>
+  <text x="168" y="925" fill="#FFFFFF" opacity=".78" font-family="sans-serif" font-size="25" letter-spacing="3">JINGXU STUDIO</text>
+</svg>'''
+
+
 class PreflightProductionExecutor:
     REQUIRED_PROVIDERS = {"AUDIO": "doubao_tts", "SUBTITLES": "doubao_asr", "STORYBOARD": "seedream", "COVER": "seedream"}
 
@@ -166,6 +181,21 @@ class PreflightProductionExecutor:
                     (output / "manifest.json").write_text(json.dumps({"model": settings.seedreamModel, "scenes": scenes}, ensure_ascii=False, indent=2), encoding="utf-8")
                 except Exception as error:
                     repository.update_production_job(job_id, status="FAILED", failed_stage="STORYBOARD", log=f"分镜生成失败：{error}")
+                    return
+            elif stage.name.value == "COVER":
+                project = repository.get(job.projectId)
+                prompt = f"电影感纪实摄影封面背景，16:9横构图，主体位于画面右侧，左侧留出干净深色标题空间，无文字无标志。主题：{project.title}。内容参考：{script.content[:160]}"
+                repository.update_production_job(job_id, status="RUNNING", stage_name="COVER", stage_status="RUNNING", progress=10, log="正在生成封面背景")
+                output = repository.database_path.parent / "projects" / str(job.projectId) / "cover"
+                output.mkdir(parents=True, exist_ok=True)
+                try:
+                    background = self.image_generator.generate(api_key=secrets.get("seedream") or "", model=settings.seedreamModel, prompt=prompt, size="2K")
+                    (output / "background.png").write_bytes(background)
+                    (output / "cover.svg").write_text(build_cover_svg(project.title, background), encoding="utf-8")
+                    (output / "manifest.json").write_text(json.dumps({"title": project.title, "brand": "镜序工坊", "model": settings.seedreamModel, "prompt": prompt}, ensure_ascii=False, indent=2), encoding="utf-8")
+                    repository.update_production_job(job_id, status="RUNNING", stage_name="COVER", stage_status="COMPLETED", progress=100, log=f"品牌封面已保存：{output / 'cover.svg'}")
+                except Exception as error:
+                    repository.update_production_job(job_id, status="FAILED", failed_stage="COVER", log=f"封面生成失败：{error}")
                     return
             elif stage.name.value != "VIDEO":
                 repository.update_production_job(job_id, status="QUEUED", log=f"{stage.name.value} 等待媒体执行器")
