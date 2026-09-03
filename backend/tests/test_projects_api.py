@@ -70,3 +70,63 @@ def test_search_uses_parameters_and_matches_title(tmp_path):
     assert response.status_code == 200
     assert [project["title"] for project in response.json()["data"]] == ["AI 摄影"]
 
+
+def test_update_project_renames_and_pins_it(tmp_path):
+    with make_client(tmp_path) as client:
+        created = client.post(
+            "/api/projects", json={"title": "旧标题", "channel": "默认栏目"}
+        ).json()
+        updated = client.patch(
+            f"/api/projects/{created['id']}",
+            json={"title": "新标题", "isPinned": True},
+        )
+        listed = client.get("/api/projects").json()["data"]
+
+    assert updated.status_code == 200
+    assert updated.json()["title"] == "新标题"
+    assert updated.json()["isPinned"] is True
+    assert listed[0]["id"] == created["id"]
+
+
+def test_trash_hides_project_and_restore_returns_it(tmp_path):
+    with make_client(tmp_path) as client:
+        created = client.post(
+            "/api/projects", json={"title": "待恢复项目", "channel": "默认栏目"}
+        ).json()
+        trashed = client.delete(f"/api/projects/{created['id']}")
+        active = client.get("/api/projects").json()["data"]
+        trash = client.get("/api/trash/projects").json()["data"]
+        restored = client.post(f"/api/trash/projects/{created['id']}/restore")
+
+    assert trashed.status_code == 204
+    assert active == []
+    assert trash[0]["title"] == "待恢复项目"
+    assert restored.status_code == 200
+    assert restored.json()["deletedAt"] is None
+
+
+def test_reorder_projects_uses_complete_active_id_list(tmp_path):
+    with make_client(tmp_path) as client:
+        first = client.post(
+            "/api/projects", json={"title": "甲", "channel": "默认栏目"}
+        ).json()
+        second = client.post(
+            "/api/projects", json={"title": "乙", "channel": "默认栏目"}
+        ).json()
+        reordered = client.put(
+            "/api/projects/order", json={"projectIds": [first["id"], second["id"]]}
+        )
+        listed = client.get("/api/projects").json()["data"]
+
+    assert reordered.status_code == 204
+    assert [item["id"] for item in listed] == [first["id"], second["id"]]
+
+
+def test_unknown_project_returns_consistent_not_found_error(tmp_path):
+    with make_client(tmp_path) as client:
+        response = client.patch("/api/projects/404", json={"title": "不存在"})
+
+    assert response.status_code == 404
+    assert response.json() == {
+        "error": {"code": "PROJECT_NOT_FOUND", "message": "项目不存在"}
+    }

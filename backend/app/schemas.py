@@ -1,6 +1,6 @@
 from datetime import datetime
 from enum import Enum
-from typing import Generic, List, TypeVar
+from typing import Generic, List, Optional, TypeVar
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
@@ -24,6 +24,26 @@ class CreateProject(BaseModel):
         return cleaned
 
 
+class UpdateProject(BaseModel):
+    title: Optional[str] = Field(default=None, min_length=1, max_length=120)
+    channel: Optional[str] = Field(default=None, min_length=1, max_length=60)
+    isPinned: Optional[bool] = None
+
+    @field_validator("title", "channel")
+    @classmethod
+    def trim_optional_text(cls, value: Optional[str]) -> Optional[str]:
+        if value is None:
+            return None
+        cleaned = value.strip()
+        if not cleaned:
+            raise ValueError("must contain visible text")
+        return cleaned
+
+
+class ProjectOrder(BaseModel):
+    projectIds: List[int] = Field(min_length=1, max_length=5000)
+
+
 class Project(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
@@ -31,6 +51,8 @@ class Project(BaseModel):
     title: str
     channel: str
     status: ProjectStatus
+    isPinned: bool
+    deletedAt: Optional[datetime]
     createdAt: datetime
     updatedAt: datetime
 
@@ -48,4 +70,3 @@ T = TypeVar("T")
 class PaginatedResponse(BaseModel, Generic[T]):
     data: List[T]
     pagination: Pagination
-
