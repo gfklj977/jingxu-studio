@@ -88,6 +88,21 @@ button { font: inherit; }
 .asset-actions { display: flex; }
 .asset-actions button { padding: 4px; border: 0; color: #94a3b8; background: transparent; cursor: pointer; }
 .placeholder-view { display: grid; justify-items: center; min-height: 420px; align-content: center; padding: 40px; border: 1px dashed #cbd5e1; border-radius: 14px; color: #64748b; background: #fff; text-align: center; }
+.script-loading { padding: 28px; }
+.script-workspace { display: grid; grid-template-columns: minmax(0, 1fr) 260px; align-items: start; gap: 18px; }
+.script-form { display: grid; gap: 18px; padding: 22px 24px 28px; }
+.script-form label { display: grid; gap: 8px; color: #334155; font-weight: 600; }
+.script-form label > span { display: flex; justify-content: space-between; }
+.script-form label small { color: #94a3b8; font-weight: 400; }
+.script-tools { display: flex; gap: 10px; margin-top: -8px; }
+.version-panel { padding: 20px; }
+.version-panel h3 { display: flex; gap: 8px; align-items: center; margin: 0 0 16px; font-size: 15px; }
+.version-panel button { display: grid; width: 100%; gap: 4px; padding: 12px; border: 1px solid #e5e7eb; border-radius: 8px; color: #334155; background: white; text-align: left; cursor: pointer; }
+.version-panel button + button { margin-top: 9px; }
+.version-panel button:hover { border-color: #5eead4; background: #f0fdfa; }
+.version-panel button small, .version-panel button span, .version-empty { color: #94a3b8; font-size: 12px; }
+.version-panel button span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+@media (max-width: 1050px) { .script-workspace { grid-template-columns: 1fr; } }
 .placeholder-view > span { color: #0f766e; font-size: 40px; }
 .placeholder-view h3 { margin: 16px 0 0; color: #0f172a; }
 .placeholder-view p { max-width: 480px; margin: 8px 0 20px; }

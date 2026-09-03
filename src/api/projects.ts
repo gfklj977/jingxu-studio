@@ -84,3 +84,29 @@ export async function reorderProjects(projectIds: number[]): Promise<void> {
   })
   if (!response.ok) throw new Error('项目排序保存失败')
 }
+
+export interface ProjectScript {
+  projectId: number
+  topic: string
+  brief: string
+  researchNotes: string
+  content: string
+  updatedAt: string
+  versions: { id: number; content: string; createdAt: string }[]
+}
+
+export async function getProjectScript(projectId: number): Promise<ProjectScript> {
+  const response = await fetch(`/api/projects/${projectId}/script`)
+  if (!response.ok) throw new Error('脚本加载失败')
+  return response.json() as Promise<ProjectScript>
+}
+
+export async function saveProjectScript(projectId: number, script: Pick<ProjectScript, 'topic' | 'brief' | 'researchNotes' | 'content'>): Promise<ProjectScript> {
+  const response = await fetch(`/api/projects/${projectId}/script`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(script),
+  })
+  if (!response.ok) throw new Error('脚本保存失败')
+  return response.json() as Promise<ProjectScript>
+}

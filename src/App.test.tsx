@@ -129,4 +129,28 @@ describe('镜序工坊工作台', () => {
       body: JSON.stringify({ projectIds: [180, 181, 179] }),
     }))
   })
+
+  it('编辑并保存项目脚本', async () => {
+    const user = userEvent.setup()
+    const fetchMock = vi.mocked(fetch)
+    fetchMock
+      .mockResolvedValueOnce({ ok: true, json: async () => ({ data: [], pagination: {} }) } as Response)
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ projectId: 181, topic: '', brief: '', researchNotes: '', content: '', updatedAt: '2026-09-03T00:00:00Z', versions: [] }),
+      } as Response)
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ projectId: 181, topic: 'AI 与摄影师', brief: '', researchNotes: '', content: '开场文案', updatedAt: '2026-09-03T00:01:00Z', versions: [{ id: 1, content: '开场文案', createdAt: '2026-09-03T00:01:00Z' }] }),
+      } as Response)
+    render(<App />)
+
+    await user.click(screen.getByRole('tab', { name: '脚本' }))
+    await user.type(await screen.findByLabelText('选题'), 'AI 与摄影师')
+    await user.type(screen.getByLabelText('脚本正文'), '开场文案')
+    await user.click(screen.getByRole('button', { name: /保存新版本/ }))
+
+    expect(fetchMock).toHaveBeenLastCalledWith('/api/projects/181/script', expect.objectContaining({ method: 'PUT' }))
+    expect(await screen.findByText('版本 1')).toBeInTheDocument()
+  })
 })

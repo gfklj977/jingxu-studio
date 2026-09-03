@@ -13,6 +13,7 @@ import {
 } from '@ant-design/icons'
 import { Button, Tag } from 'antd'
 import type { Project, Stage } from '../types'
+import { ScriptWorkspace } from './ScriptWorkspace'
 
 const stages: Stage[] = ['脚本', '生产', '成片', '投放']
 
@@ -71,10 +72,6 @@ function PipelineView() {
   return <section className="placeholder-view"><CloudUploadOutlined /><h3>生产流水线</h3><p>上传素材并依次生成配音、字幕、场景图、封面和视频。</p><Button type="primary">开始生产</Button></section>
 }
 
-function ScriptView() {
-  return <section className="placeholder-view"><FileTextOutlined /><h3>脚本工作区</h3><p>编写选题简报，联网搜索资料，并生成可追溯版本的口播脚本。</p><Button type="primary">生成脚本</Button></section>
-}
-
 function PublishView() {
   return <section className="placeholder-view"><CloudUploadOutlined /><h3>辅助投放</h3><p>自动填写抖音、小红书和视频号发布信息，由你检查后手动发布。</p><Button type="primary">准备发布</Button></section>
 }
@@ -91,7 +88,7 @@ export function Workspace({ project, stage, onStageChange }: WorkspaceProps) {
       <div className="workspace-body">
         {stage === '成片' && <ResultsView />}
         {stage === '生产' && <PipelineView />}
-        {stage === '脚本' && <ScriptView />}
+        {stage === '脚本' && <ScriptWorkspace key={project.id} projectId={project.id} />}
         {stage === '投放' && <PublishView />}
       </div>
     </main>
