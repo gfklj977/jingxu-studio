@@ -471,3 +471,22 @@ def test_video_stage_composes_existing_assets_to_mp4(tmp_path):
     assert loaded.json()["status"] == "COMPLETED"
     assert loaded.json()["stages"][0] == {"name": "VIDEO", "status": "COMPLETED", "progress": 100}
     assert (root / "video" / "final.mp4").read_bytes() == b"fake mp4"
+
+
+def test_project_artifacts_are_listed_and_served_without_path_traversal(tmp_path):
+    with make_client(tmp_path) as client:
+        project = client.post("/api/projects", json={"title": "结果中心", "channel": "默认栏目"}).json()
+        root = tmp_path / "projects" / str(project["id"])
+        (root / "video").mkdir(parents=True)
+        (root / "video" / "final.mp4").write_bytes(b"video-data")
+        (root / "subtitles").mkdir()
+        (root / "subtitles" / "captions.srt").write_text("subtitle")
+        listed = client.get(f"/api/projects/{project['id']}/artifacts")
+        served = client.get(f"/api/projects/{project['id']}/artifacts/video/final.mp4")
+        traversal = client.get(f"/api/projects/{project['id']}/artifacts/../jingxu-test.db")
+
+    assert listed.status_code == 200
+    assert [item["path"] for item in listed.json()["data"]] == ["subtitles/captions.srt", "video/final.mp4"]
+    assert listed.json()["data"][1]["kind"] == "video"
+    assert served.content == b"video-data"
+    assert traversal.status_code == 404

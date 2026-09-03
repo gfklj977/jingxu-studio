@@ -23,6 +23,7 @@ export default function App() {
   const [trashItems, setTrashItems] = useState<Project[]>([])
   const [trashLoading, setTrashLoading] = useState(false)
   const [settingsOpen, setSettingsOpen] = useState(false)
+  const [resultsEnabled, setResultsEnabled] = useState(false)
   const project = projectItems.find((item) => item.id === selectedId) ?? projectItems[0]
   const normalizedSearch = searchValue.trim().toLocaleLowerCase('zh-CN')
   const visibleProjects = normalizedSearch
@@ -32,6 +33,7 @@ export default function App() {
   useEffect(() => {
     listProjects().then((loaded) => {
       if (loaded.length > 0) {
+        setResultsEnabled(true)
         setProjectItems(loaded)
         setSelectedId(loaded[0].id)
       }
@@ -44,6 +46,7 @@ export default function App() {
       const created = await createProject(title, channel)
       setProjectItems((current) => [created, ...current])
       setSelectedId(created.id)
+      setResultsEnabled(true)
       setDialogOpen(false)
     } catch {
       return
@@ -108,7 +111,7 @@ export default function App() {
       <AntApp>
         <div className="app-shell">
           <Sidebar projects={visibleProjects} selectedId={selectedId} onSelect={setSelectedId} onCreate={() => setDialogOpen(true)} searchValue={searchValue} onSearchChange={setSearchValue} onRename={setEditingProject} onTogglePin={handleTogglePin} onTrash={setDeletingProject} onOpenTrash={openTrash} onReorder={handleReorder} reorderEnabled={!normalizedSearch} onOpenSettings={() => setSettingsOpen(true)} />
-          <Workspace project={project} stage={stage} onStageChange={setStage} />
+          <Workspace project={project} stage={stage} onStageChange={setStage} resultsEnabled={resultsEnabled} />
         </div>
         <CreateProjectDialog open={dialogOpen} submitting={submitting} onCancel={() => setDialogOpen(false)} onCreate={handleCreate} />
         <RenameProjectDialog project={editingProject} onCancel={() => setEditingProject(null)} onRename={handleRename} />

@@ -6,12 +6,12 @@ from typing import Optional
 
 from fastapi import BackgroundTasks, FastAPI, HTTPException, Query, Request
 from fastapi.exceptions import RequestValidationError
-from fastapi.responses import JSONResponse
+from fastapi.responses import FileResponse, JSONResponse
 
 from .database import ActiveProductionJob, InvalidProjectOrder, ProjectNotFound, ProjectRepository
 from .providers import HttpProviderTester, ProviderTester
 from .production import PreflightProductionExecutor, ProductionExecutor
-from .schemas import CreateProject, GeneratedScript, GenerateScriptRequest, PaginatedResponse, Pagination, ProductionJob, ProductionSettings, Project, ProjectOrder, ProjectScript, ProviderCatalog, ProviderSecret, ProviderStatus, ProviderTestResult, ResearchItem, ResearchRequest, ResearchResult, SaveScript, UpdateProject
+from .schemas import CreateProject, GeneratedScript, GenerateScriptRequest, PaginatedResponse, Pagination, ProductionJob, ProductionSettings, Project, ProjectArtifact, ProjectArtifactList, ProjectOrder, ProjectScript, ProviderCatalog, ProviderSecret, ProviderStatus, ProviderTestResult, ResearchItem, ResearchRequest, ResearchResult, SaveScript, UpdateProject
 from .secrets import KeyringSecretStore, SecretStore
 
 
@@ -226,6 +226,23 @@ def create_app(database_path: Path = DEFAULT_DATA_PATH, secret_store: Optional[S
     @app.post("/api/production-jobs/{job_id}/cancel", response_model=ProductionJob)
     def cancel_production_job(job_id: int):
         return repository.cancel_production_job(job_id)
+
+    @app.get("/api/projects/{project_id}/artifacts", response_model=ProjectArtifactList)
+    def list_project_artifacts(project_id: int):
+        repository.get(project_id)
+        root = repository.database_path.parent / "projects" / str(project_id)
+        kinds = {".mp4": "video", ".mp3": "audio", ".png": "image", ".jpg": "image", ".jpeg": "image", ".svg": "image", ".srt": "document", ".json": "document"}
+        artifacts = [] if not root.exists() else [ProjectArtifact(path=str(path.relative_to(root)), name=path.name, kind=kinds[path.suffix.lower()], size=path.stat().st_size) for path in sorted(root.rglob("*")) if path.is_file() and path.suffix.lower() in kinds]
+        return ProjectArtifactList(data=artifacts)
+
+    @app.get("/api/projects/{project_id}/artifacts/{artifact_path:path}")
+    def get_project_artifact(project_id: int, artifact_path: str):
+        repository.get(project_id)
+        root = (repository.database_path.parent / "projects" / str(project_id)).resolve()
+        target = (root / artifact_path).resolve()
+        if root not in target.parents or not target.is_file():
+            raise HTTPException(status_code=404, detail="产物不存在")
+        return FileResponse(target, filename=target.name, content_disposition_type="inline")
 
     return app
 

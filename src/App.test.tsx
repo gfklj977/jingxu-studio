@@ -20,6 +20,18 @@ describe('镜序工坊工作台', () => {
     expect(screen.getByText('项目成片')).toBeInTheDocument()
   })
 
+  it('从后端加载并预览项目真实产物', async () => {
+    const fetchMock = vi.mocked(fetch)
+    fetchMock
+      .mockResolvedValueOnce({ ok: true, json: async () => ({ data: [{ id: 181, title: '摄影师如何看待 AI 时代', channel: '默认栏目', status: 'DRAFT', isPinned: false, deletedAt: null, updatedAt: '2026-09-03T00:00:00Z' }], pagination: {} }) } as Response)
+      .mockResolvedValueOnce({ ok: true, json: async () => ({ data: [{ path: 'video/final.mp4', name: 'final.mp4', kind: 'video', size: 2048 }, { path: 'audio/voice.mp3', name: 'voice.mp3', kind: 'audio', size: 1024 }] }) } as Response)
+    render(<App />)
+
+    expect(await screen.findByText('final.mp4')).toBeInTheDocument()
+    expect(screen.getByLabelText('预览 final.mp4')).toHaveAttribute('src', '/api/projects/181/artifacts/video/final.mp4')
+    expect(screen.getByText(/2 KB/)).toBeInTheDocument()
+  })
+
   it('允许切换项目并同步主内容标题', async () => {
     const user = userEvent.setup()
     render(<App />)
@@ -58,7 +70,7 @@ describe('镜序工坊工作台', () => {
     await user.click(screen.getByRole('button', { name: '创建项目' }))
 
     expect(await screen.findByRole('heading', { name: '新项目标题' })).toBeInTheDocument()
-    expect(fetchMock).toHaveBeenLastCalledWith('/api/projects', expect.objectContaining({ method: 'POST' }))
+    expect(fetchMock).toHaveBeenCalledWith('/api/projects', expect.objectContaining({ method: 'POST' }))
   })
 
   it('按项目标题或栏目筛选侧栏项目', async () => {

@@ -164,6 +164,17 @@ class ProductionJob(BaseModel):
     updatedAt: datetime
 
 
+class ProjectArtifact(BaseModel):
+    path: str
+    name: str
+    kind: str
+    size: int
+
+
+class ProjectArtifactList(BaseModel):
+    data: List[ProjectArtifact]
+
+
 class Pagination(BaseModel):
     page: int
     pageSize: int

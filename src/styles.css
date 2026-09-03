@@ -87,6 +87,11 @@ button { font: inherit; }
 .asset-meta small { margin-top: 3px; color: #94a3b8; font-size: 10px; }
 .asset-actions { display: flex; }
 .asset-actions button { padding: 4px; border: 0; color: #94a3b8; background: transparent; cursor: pointer; }
+.asset-actions a { padding: 4px; color: #64748b; }
+.asset-empty { padding: 72px 24px; color: #94a3b8; text-align: center; }
+.asset-card video, .asset-card img { width: 100%; object-fit: cover; }
+.audio-preview audio { width: calc(100% - 32px); }
+.document-preview { color: #64748b; text-decoration: none; }
 .placeholder-view { display: grid; justify-items: center; min-height: 420px; align-content: center; padding: 40px; border: 1px dashed #cbd5e1; border-radius: 14px; color: #64748b; background: #fff; text-align: center; }
 .script-loading { padding: 28px; }
 .script-workspace { display: grid; grid-template-columns: minmax(0, 1fr) 260px; align-items: start; gap: 18px; }
