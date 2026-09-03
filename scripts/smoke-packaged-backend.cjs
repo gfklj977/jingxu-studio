@@ -42,6 +42,25 @@ async function waitForHealth(port, { timeoutMs = 20_000, intervalMs = 200, child
   throw new Error(`内置后端未在 ${timeoutMs}ms 内就绪：${lastError?.message || '无响应'}`)
 }
 
+function terminationCommand(platform, pid) {
+  if (platform !== 'win32') return null
+  return { command: 'taskkill', args: ['/pid', String(pid), '/T', '/F'] }
+}
+
+async function terminateChild(child, platform) {
+  if (child.exitCode !== null) return
+  const command = terminationCommand(platform, child.pid)
+  if (!command) {
+    child.kill()
+    return
+  }
+  await new Promise((resolve) => {
+    const killer = spawn(command.command, command.args, { stdio: 'ignore' })
+    killer.once('error', resolve)
+    killer.once('exit', resolve)
+  })
+}
+
 async function smokePackagedBackend({ releaseDir, platform, port = 18765 }) {
   const { backend, web } = findPackagedResources(releaseDir, platform)
   const dataDir = mkdtempSync(join(tmpdir(), 'jingxu-smoke-data-'))
@@ -63,7 +82,7 @@ async function smokePackagedBackend({ releaseDir, platform, port = 18765 }) {
   } catch (error) {
     throw new Error(`${error.message}${stderr ? `\n${stderr.trim()}` : ''}`)
   } finally {
-    if (child.exitCode === null) child.kill()
+    await terminateChild(child, platform)
     await Promise.race([
       new Promise((resolve) => child.once('exit', resolve)),
       new Promise((resolve) => setTimeout(resolve, 3000)),
@@ -85,4 +104,4 @@ if (require.main === module) {
     })
 }
 
-module.exports = { findPackagedResources, smokePackagedBackend, waitForHealth }
+module.exports = { findPackagedResources, smokePackagedBackend, terminationCommand, waitForHealth }

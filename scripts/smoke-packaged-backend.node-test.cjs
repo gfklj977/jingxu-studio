@@ -5,7 +5,15 @@ const { join } = require('node:path')
 const test = require('node:test')
 const assert = require('node:assert/strict')
 
-const { findPackagedResources, waitForHealth } = require('./smoke-packaged-backend.cjs')
+const { findPackagedResources, terminationCommand, waitForHealth } = require('./smoke-packaged-backend.cjs')
+
+test('terminates the complete PyInstaller process tree on Windows', () => {
+  assert.deepEqual(terminationCommand('win32', 4321), {
+    command: 'taskkill',
+    args: ['/pid', '4321', '/T', '/F'],
+  })
+  assert.equal(terminationCommand('darwin', 4321), null)
+})
 
 test('finds Windows packaged backend and web resources', () => {
   const releaseDir = mkdtempSync(join(tmpdir(), 'jingxu-smoke-'))
