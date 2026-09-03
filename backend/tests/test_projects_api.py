@@ -70,8 +70,8 @@ class FakeProviderTester:
         return f"生成脚本：{topic}\n{brief}\n{research_notes}"
 
 
-def make_client(tmp_path, secret_store=None, provider_tester=None, production_executor=None, folder_opener=None):
-    app = create_app(tmp_path / "jingxu-test.db", secret_store=secret_store or FakeSecretStore(), provider_tester=provider_tester or FakeProviderTester(), production_executor=production_executor or NoopProductionExecutor(), folder_opener=folder_opener)
+def make_client(tmp_path, secret_store=None, provider_tester=None, production_executor=None, folder_opener=None, publish_launcher=None):
+    app = create_app(tmp_path / "jingxu-test.db", secret_store=secret_store or FakeSecretStore(), provider_tester=provider_tester or FakeProviderTester(), production_executor=production_executor or NoopProductionExecutor(), folder_opener=folder_opener, publish_launcher=publish_launcher)
     return TestClient(app)
 
 
@@ -529,3 +529,26 @@ def test_generate_edit_and_reload_publish_drafts(tmp_path):
     assert "#儿童摄影" in generated.json()["data"][0]["hashtags"]
     assert saved.json()["title"] == "人工修改后的标题"
     assert loaded.json()["data"][0]["title"] == "人工修改后的标题"
+
+
+def test_prepare_publish_package_validates_assets_and_launches_platform(tmp_path):
+    launched = []
+    with make_client(tmp_path, publish_launcher=lambda url, text: launched.append((url, text))) as client:
+        project = client.post("/api/projects", json={"title": "待发布", "channel": "默认栏目"}).json()
+        client.put(f"/api/projects/{project['id']}/script", json={"content": "发布正文"})
+        client.post(f"/api/projects/{project['id']}/publish-drafts/generate")
+        missing = client.post(f"/api/projects/{project['id']}/publish-drafts/DOUYIN/prepare")
+        root = tmp_path / "projects" / str(project["id"])
+        (root / "video").mkdir(parents=True)
+        (root / "video" / "final.mp4").write_bytes(b"video")
+        (root / "cover").mkdir()
+        (root / "cover" / "background.png").write_bytes(b"cover")
+        prepared = client.post(f"/api/projects/{project['id']}/publish-drafts/DOUYIN/prepare")
+
+    assert missing.status_code == 409
+    assert prepared.status_code == 200
+    assert prepared.json()["status"] == "READY_FOR_MANUAL_PUBLISH"
+    assert launched[0][0] == "https://creator.douyin.com/"
+    assert "待发布" in launched[0][1]
+    package = json.loads((root / "publish" / "DOUYIN" / "package.json").read_text())
+    assert package["videoPath"].endswith("video/final.mp4")

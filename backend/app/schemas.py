@@ -191,6 +191,14 @@ class PublishDraftList(BaseModel):
     data: List[PublishDraft]
 
 
+class PublishPreparation(BaseModel):
+    status: str
+    platform: str
+    packagePath: str
+    videoPath: str
+    coverPath: str
+
+
 class Pagination(BaseModel):
     page: int
     pageSize: int

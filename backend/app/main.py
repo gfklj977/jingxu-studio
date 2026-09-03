@@ -2,6 +2,8 @@ import math
 import httpx
 import platform
 import subprocess
+import json
+import webbrowser
 from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Callable, Optional
@@ -13,7 +15,7 @@ from fastapi.responses import FileResponse, JSONResponse
 from .database import ActiveProductionJob, InvalidProjectOrder, ProjectNotFound, ProjectRepository
 from .providers import HttpProviderTester, ProviderTester
 from .production import PreflightProductionExecutor, ProductionExecutor
-from .schemas import CreateProductionJob, CreateProject, GeneratedScript, GenerateScriptRequest, PaginatedResponse, Pagination, ProductionJob, ProductionSettings, Project, ProjectArtifact, ProjectArtifactList, ProjectOrder, ProjectScript, ProviderCatalog, ProviderSecret, ProviderStatus, ProviderTestResult, PublishDraft, PublishDraftList, ResearchItem, ResearchRequest, ResearchResult, SaveScript, UpdateProject
+from .schemas import CreateProductionJob, CreateProject, GeneratedScript, GenerateScriptRequest, PaginatedResponse, Pagination, ProductionJob, ProductionSettings, Project, ProjectArtifact, ProjectArtifactList, ProjectOrder, ProjectScript, ProviderCatalog, ProviderSecret, ProviderStatus, ProviderTestResult, PublishDraft, PublishDraftList, PublishPreparation, ResearchItem, ResearchRequest, ResearchResult, SaveScript, UpdateProject
 from .secrets import KeyringSecretStore, SecretStore
 
 
@@ -38,12 +40,19 @@ def _open_folder(path: Path) -> None:
     subprocess.Popen(command)
 
 
-def create_app(database_path: Path = DEFAULT_DATA_PATH, secret_store: Optional[SecretStore] = None, provider_tester: Optional[ProviderTester] = None, production_executor: Optional[ProductionExecutor] = None, folder_opener: Optional[Callable[[Path], None]] = None) -> FastAPI:
+def _launch_publish_page(url: str, text: str) -> None:
+    clipboard = ["pbcopy"] if platform.system() == "Darwin" else ["clip"] if platform.system() == "Windows" else ["xclip", "-selection", "clipboard"]
+    subprocess.run(clipboard, input=text, text=True, check=True)
+    webbrowser.open(url)
+
+
+def create_app(database_path: Path = DEFAULT_DATA_PATH, secret_store: Optional[SecretStore] = None, provider_tester: Optional[ProviderTester] = None, production_executor: Optional[ProductionExecutor] = None, folder_opener: Optional[Callable[[Path], None]] = None, publish_launcher: Optional[Callable[[str, str], None]] = None) -> FastAPI:
     repository = ProjectRepository(Path(database_path))
     secrets = secret_store or KeyringSecretStore()
     tester = provider_tester or HttpProviderTester()
     executor = production_executor or PreflightProductionExecutor()
     open_folder = folder_opener or _open_folder
+    launch_publish = publish_launcher or _launch_publish_page
 
     @asynccontextmanager
     async def lifespan(_: FastAPI):
@@ -234,6 +243,31 @@ def create_app(database_path: Path = DEFAULT_DATA_PATH, secret_store: Optional[S
         if platform != payload.platform:
             raise HTTPException(status_code=409, detail="平台不一致")
         return repository.save_publish_draft(project_id, payload)
+
+    @app.post("/api/projects/{project_id}/publish-drafts/{platform}/prepare", response_model=PublishPreparation)
+    def prepare_publish(project_id: int, platform: str):
+        urls = {"DOUYIN": "https://creator.douyin.com/", "XIAOHONGSHU": "https://creator.xiaohongshu.com/publish/publish?source=official", "WECHAT_CHANNELS": "https://channels.weixin.qq.com/platform/post/create"}
+        if platform not in urls:
+            raise HTTPException(status_code=404, detail="平台不存在")
+        drafts = {item.platform: item for item in repository.get_publish_drafts(project_id).data}
+        if platform not in drafts:
+            raise HTTPException(status_code=409, detail="请先生成投放草稿")
+        root = repository.database_path.parent / "projects" / str(project_id)
+        video = root / "video" / "final.mp4"
+        cover = root / "cover" / "background.png"
+        if not video.exists() or not cover.exists():
+            raise HTTPException(status_code=409, detail="请先生成成片和封面")
+        draft = drafts[platform]
+        text = f"{draft.title}\n\n{draft.body}\n\n{draft.hashtags}"
+        package_dir = root / "publish" / platform
+        package_dir.mkdir(parents=True, exist_ok=True)
+        package_path = package_dir / "package.json"
+        package_path.write_text(json.dumps({**draft.model_dump(), "videoPath": str(video), "coverPath": str(cover), "status": "READY_FOR_MANUAL_PUBLISH"}, ensure_ascii=False, indent=2), encoding="utf-8")
+        try:
+            launch_publish(urls[platform], text)
+        except (OSError, subprocess.SubprocessError) as error:
+            raise HTTPException(status_code=500, detail=f"无法打开发布页：{error}")
+        return PublishPreparation(status="READY_FOR_MANUAL_PUBLISH", platform=platform, packagePath=str(package_path), videoPath=str(video), coverPath=str(cover))
 
     @app.post("/api/projects/{project_id}/production-jobs", response_model=ProductionJob, status_code=201)
     def create_production_job(project_id: int, background_tasks: BackgroundTasks, payload: Optional[CreateProductionJob] = None):
