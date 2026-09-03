@@ -130,3 +130,52 @@ def test_unknown_project_returns_consistent_not_found_error(tmp_path):
     assert response.json() == {
         "error": {"code": "PROJECT_NOT_FOUND", "message": "项目不存在"}
     }
+
+
+def test_save_script_persists_draft_and_creates_versions(tmp_path):
+    with make_client(tmp_path) as client:
+        project = client.post(
+            "/api/projects", json={"title": "AI 新选题", "channel": "默认栏目"}
+        ).json()
+        first = client.put(
+            f"/api/projects/{project['id']}/script",
+            json={
+                "topic": "AI 会不会取代摄影师",
+                "brief": "面向摄影门店老板",
+                "researchNotes": "资料摘要",
+                "content": "第一版脚本",
+            },
+        )
+        second = client.put(
+            f"/api/projects/{project['id']}/script",
+            json={
+                "topic": "AI 会不会取代摄影师",
+                "brief": "面向摄影门店老板",
+                "researchNotes": "资料摘要",
+                "content": "第二版脚本",
+            },
+        )
+        loaded = client.get(f"/api/projects/{project['id']}/script")
+
+    assert first.status_code == 200
+    assert second.status_code == 200
+    assert loaded.json()["content"] == "第二版脚本"
+    assert [version["content"] for version in loaded.json()["versions"]] == [
+        "第二版脚本",
+        "第一版脚本",
+    ]
+
+
+def test_script_rejects_oversized_input_and_unknown_project(tmp_path):
+    with make_client(tmp_path) as client:
+        project = client.post(
+            "/api/projects", json={"title": "脚本验证", "channel": "默认栏目"}
+        ).json()
+        oversized = client.put(
+            f"/api/projects/{project['id']}/script",
+            json={"topic": "题" * 201, "brief": "", "researchNotes": "", "content": ""},
+        )
+        missing = client.get("/api/projects/999/script")
+
+    assert oversized.status_code == 422
+    assert missing.status_code == 404

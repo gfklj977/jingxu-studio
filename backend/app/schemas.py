@@ -57,6 +57,30 @@ class Project(BaseModel):
     updatedAt: datetime
 
 
+class ScriptVersion(BaseModel):
+    id: int
+    content: str
+    createdAt: datetime
+
+
+class SaveScript(BaseModel):
+    topic: str = Field(default="", max_length=200)
+    brief: str = Field(default="", max_length=4000)
+    researchNotes: str = Field(default="", max_length=20000)
+    content: str = Field(default="", max_length=50000)
+
+    @field_validator("topic", "brief", "researchNotes", "content")
+    @classmethod
+    def trim_script_text(cls, value: str) -> str:
+        return value.strip()
+
+
+class ProjectScript(SaveScript):
+    projectId: int
+    updatedAt: datetime
+    versions: List[ScriptVersion]
+
+
 class Pagination(BaseModel):
     page: int
     pageSize: int

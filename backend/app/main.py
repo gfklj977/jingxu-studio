@@ -7,7 +7,7 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 
 from .database import InvalidProjectOrder, ProjectNotFound, ProjectRepository
-from .schemas import CreateProject, PaginatedResponse, Pagination, Project, ProjectOrder, UpdateProject
+from .schemas import CreateProject, PaginatedResponse, Pagination, Project, ProjectOrder, ProjectScript, SaveScript, UpdateProject
 
 
 DEFAULT_DATA_PATH = Path.home() / "Library" / "Application Support" / "JingxuStudio" / "data" / "app.db"
@@ -119,6 +119,14 @@ def create_app(database_path: Path = DEFAULT_DATA_PATH) -> FastAPI:
     @app.post("/api/trash/projects/{project_id}/restore", response_model=Project)
     def restore_project(project_id: int):
         return repository.restore(project_id)
+
+    @app.get("/api/projects/{project_id}/script", response_model=ProjectScript)
+    def get_project_script(project_id: int):
+        return repository.get_script(project_id)
+
+    @app.put("/api/projects/{project_id}/script", response_model=ProjectScript)
+    def save_project_script(project_id: int, payload: SaveScript):
+        return repository.save_script(project_id, payload)
 
     return app
 

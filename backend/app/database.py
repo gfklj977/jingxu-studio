@@ -3,7 +3,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import List, Optional, Tuple
 
-from .schemas import CreateProject, Project, ProjectStatus, UpdateProject
+from .schemas import CreateProject, Project, ProjectScript, ProjectStatus, SaveScript, ScriptVersion, UpdateProject
 
 
 class ProjectNotFound(Exception):
@@ -43,6 +43,30 @@ class ProjectRepository:
                 if column not in columns:
                     connection.execute(statement)
             connection.execute("UPDATE projects SET position = id WHERE position = 0")
+            connection.execute(
+                """
+                CREATE TABLE IF NOT EXISTS project_scripts (
+                    project_id INTEGER PRIMARY KEY,
+                    topic TEXT NOT NULL DEFAULT '',
+                    brief TEXT NOT NULL DEFAULT '',
+                    research_notes TEXT NOT NULL DEFAULT '',
+                    content TEXT NOT NULL DEFAULT '',
+                    updated_at TEXT NOT NULL,
+                    FOREIGN KEY(project_id) REFERENCES projects(id)
+                )
+                """
+            )
+            connection.execute(
+                """
+                CREATE TABLE IF NOT EXISTS script_versions (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    project_id INTEGER NOT NULL,
+                    content TEXT NOT NULL,
+                    created_at TEXT NOT NULL,
+                    FOREIGN KEY(project_id) REFERENCES projects(id)
+                )
+                """
+            )
 
     def create(self, payload: CreateProject) -> Project:
         now = datetime.now(timezone.utc).isoformat()
@@ -147,6 +171,61 @@ class ProjectRepository:
         if row is None:
             raise ProjectNotFound()
         return self._to_project(row)
+
+    def get_script(self, project_id: int) -> ProjectScript:
+        with self._connect() as connection:
+            project = connection.execute(
+                "SELECT id FROM projects WHERE id = ? AND deleted_at IS NULL", (project_id,)
+            ).fetchone()
+            if project is None:
+                raise ProjectNotFound()
+            row = connection.execute(
+                "SELECT * FROM project_scripts WHERE project_id = ?", (project_id,)
+            ).fetchone()
+            versions = connection.execute(
+                "SELECT * FROM script_versions WHERE project_id = ? ORDER BY id DESC LIMIT 50",
+                (project_id,),
+            ).fetchall()
+        now = datetime.now(timezone.utc)
+        return ProjectScript(
+            projectId=project_id,
+            topic=row["topic"] if row else "",
+            brief=row["brief"] if row else "",
+            researchNotes=row["research_notes"] if row else "",
+            content=row["content"] if row else "",
+            updatedAt=datetime.fromisoformat(row["updated_at"]) if row else now,
+            versions=[
+                ScriptVersion(id=item["id"], content=item["content"], createdAt=datetime.fromisoformat(item["created_at"]))
+                for item in versions
+            ],
+        )
+
+    def save_script(self, project_id: int, payload: SaveScript) -> ProjectScript:
+        self.get_script(project_id)
+        now = datetime.now(timezone.utc).isoformat()
+        with self._connect() as connection:
+            previous = connection.execute(
+                "SELECT content FROM project_scripts WHERE project_id = ?", (project_id,)
+            ).fetchone()
+            connection.execute(
+                """
+                INSERT INTO project_scripts (project_id, topic, brief, research_notes, content, updated_at)
+                VALUES (?, ?, ?, ?, ?, ?)
+                ON CONFLICT(project_id) DO UPDATE SET
+                    topic = excluded.topic,
+                    brief = excluded.brief,
+                    research_notes = excluded.research_notes,
+                    content = excluded.content,
+                    updated_at = excluded.updated_at
+                """,
+                (project_id, payload.topic, payload.brief, payload.researchNotes, payload.content, now),
+            )
+            if payload.content and (previous is None or previous["content"] != payload.content):
+                connection.execute(
+                    "INSERT INTO script_versions (project_id, content, created_at) VALUES (?, ?, ?)",
+                    (project_id, payload.content, now),
+                )
+        return self.get_script(project_id)
 
     def _connect(self) -> sqlite3.Connection:
         connection = sqlite3.connect(self.database_path)
