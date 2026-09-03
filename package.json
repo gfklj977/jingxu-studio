@@ -16,7 +16,9 @@
     "desktop:dev": "concurrently -k \"npm run api\" \"npm run dev\" \"wait-on http://127.0.0.1:5173 http://127.0.0.1:8765/api/health && cross-env JINGXU_DEV_URL=http://127.0.0.1:5173 electron .\"",
     "backend:pack": "node scripts/build-backend.cjs",
     "desktop:pack:mac": "npm run build && npm run backend:pack && electron-builder --mac --arm64 --config.electronDist=node_modules/electron/dist",
-    "desktop:pack:win": "npm run build && npm run backend:pack && electron-builder --win --x64 --config.electronDist=node_modules/electron/dist"
+    "desktop:pack:win": "npm run build && npm run backend:pack && electron-builder --win --x64 --config.electronDist=node_modules/electron/dist",
+    "release:check": "node scripts/release-check.cjs",
+    "release:checksums": "node scripts/checksum-release.cjs"
   },
   "dependencies": {
     "@ant-design/icons": "^6.1.0",

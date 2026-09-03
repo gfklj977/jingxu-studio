@@ -1,14 +1,49 @@
 name: Desktop builds
 
 on:
-  workflow_dispatch:
+  pull_request:
+    branches: [main]
   push:
+    branches: [main]
     tags:
       - "v*"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: desktop-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
+  quality:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+      - run: python -m venv .venv
+      - run: .venv/bin/pip install -r backend/requirements.txt
+      - run: npm ci
+      - run: npm run release:check
+      - run: npm run lint
+      - run: npm test -- --run
+      - run: PYTHONPATH=backend .venv/bin/pytest -q backend/tests
+      - run: npm audit --omit=dev --audit-level=high
+      - run: npm run build
+
   package:
+    needs: quality
+    if: github.event_name == 'workflow_dispatch' || startsWith(github.ref, 'refs/tags/v')
     strategy:
+      fail-fast: false
       matrix:
         include:
           - os: macos-14
@@ -34,8 +69,15 @@ jobs:
       - run: npm ci
       - run: npm run ${{ matrix.command }}
         env:
-          CSC_IDENTITY_AUTO_DISCOVERY: "false"
+          CSC_LINK: ${{ runner.os == 'macOS' && secrets.MAC_CSC_LINK || secrets.WIN_CSC_LINK }}
+          CSC_KEY_PASSWORD: ${{ runner.os == 'macOS' && secrets.MAC_CSC_KEY_PASSWORD || secrets.WIN_CSC_KEY_PASSWORD }}
+          APPLE_ID: ${{ runner.os == 'macOS' && secrets.APPLE_ID || '' }}
+          APPLE_APP_SPECIFIC_PASSWORD: ${{ runner.os == 'macOS' && secrets.APPLE_APP_SPECIFIC_PASSWORD || '' }}
+          APPLE_TEAM_ID: ${{ runner.os == 'macOS' && secrets.APPLE_TEAM_ID || '' }}
+      - run: npm run release:checksums
       - uses: actions/upload-artifact@v4
         with:
           name: jingxu-${{ runner.os }}
           path: release/*
+          if-no-files-found: error
+          retention-days: 14
