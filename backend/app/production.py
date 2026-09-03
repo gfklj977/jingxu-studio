@@ -1,6 +1,7 @@
 import base64
 import json
 import re
+import subprocess
 import uuid
 from html import escape
 from typing import Optional, Protocol
@@ -90,6 +91,48 @@ class HttpSeedreamImageGenerator:
         return image_response.content
 
 
+class VideoComposer(Protocol):
+    def compose(self, *, images: list, audio_path, subtitles_path, output_path, voice_volume: float, bgm_volume: float) -> None: ...
+
+
+class FfmpegVideoComposer:
+    def compose(self, *, images: list, audio_path, subtitles_path, output_path, voice_volume: float, bgm_volume: float) -> None:
+        try:
+            import imageio_ffmpeg
+            executable = imageio_ffmpeg.get_ffmpeg_exe()
+        except Exception as error:
+            raise RuntimeError("FFmpeg 运行时未安装，请重新安装应用依赖") from error
+        srt = subtitles_path.read_text(encoding="utf-8")
+        matches = re.findall(r"-->\s+(\d{2}):(\d{2}):(\d{2}),(\d{3})", srt)
+        if not matches:
+            raise RuntimeError("字幕文件没有有效时间轴")
+        hours, minutes, seconds, millis = map(int, matches[-1])
+        content_duration = max(hours * 3600 + minutes * 60 + seconds + millis / 1000, len(images) * 3)
+        scene_duration = content_duration / len(images)
+        total_duration = content_duration + 2
+        command = [executable, "-y"]
+        for image in images:
+            command.extend(["-loop", "1", "-t", f"{scene_duration:.3f}", "-i", str(image)])
+        audio_index = len(images)
+        end_index = audio_index + 1
+        command.extend(["-i", str(audio_path), "-f", "lavfi", "-t", "2", "-i", "color=c=0x07111F:s=1920x1080:r=30"])
+        filters = []
+        for index in range(len(images)):
+            fade_out = max(scene_duration - 0.35, 0)
+            filters.append(f"[{index}:v]scale=1920:1080:force_original_aspect_ratio=increase,crop=1920:1080,fps=30,format=yuv420p,fade=t=in:st=0:d=0.35,fade=t=out:st={fade_out:.3f}:d=0.35,setpts=PTS-STARTPTS[v{index}]")
+        filters.append(f"[{end_index}:v]drawtext=text='JINGXU STUDIO':fontcolor=white:fontsize=72:x=(w-text_w)/2:y=(h-text_h)/2,fade=t=in:st=0:d=0.35,format=yuv420p[vend]")
+        inputs = "".join(f"[v{index}]" for index in range(len(images))) + "[vend]"
+        filters.append(f"{inputs}concat=n={len(images) + 1}:v=1:a=0[vcat]")
+        escaped_subtitles = str(subtitles_path).replace("\\", "\\\\").replace(":", "\\:").replace("'", "\\'")
+        filters.append(f"[vcat]subtitles='{escaped_subtitles}':force_style='FontSize=22,PrimaryColour=&H00FFFFFF,OutlineColour=&H00000000,BorderStyle=1,Outline=2,Shadow=0,MarginV=56'[vout]")
+        filters.append(f"[{audio_index}:a]volume={voice_volume},apad=pad_dur=2[aout]")
+        command.extend(["-filter_complex", ";".join(filters), "-map", "[vout]", "-map", "[aout]", "-t", f"{total_duration:.3f}", "-r", "30", "-c:v", "libx264", "-preset", "medium", "-crf", "20", "-c:a", "aac", "-b:a", "192k", "-movflags", "+faststart", str(output_path)])
+        output_path.parent.mkdir(parents=True, exist_ok=True)
+        result = subprocess.run(command, capture_output=True, text=True)
+        if result.returncode != 0:
+            raise RuntimeError(result.stderr.strip()[-3000:] or "FFmpeg 合成失败")
+
+
 def build_storyboard(script: str, count: int) -> list[dict]:
     sentences = [part.strip() for part in re.findall(r"[^。！？!?\n]+[。！？!?]?", script) if part.strip()]
     scenes = sentences[:count]
@@ -115,10 +158,11 @@ def build_cover_svg(title: str, background: bytes) -> str:
 class PreflightProductionExecutor:
     REQUIRED_PROVIDERS = {"AUDIO": "doubao_tts", "SUBTITLES": "doubao_asr", "STORYBOARD": "seedream", "COVER": "seedream"}
 
-    def __init__(self, tts_synthesizer: Optional[TtsSynthesizer] = None, asr_recognizer: Optional[AsrRecognizer] = None, image_generator: Optional[ImageGenerator] = None):
+    def __init__(self, tts_synthesizer: Optional[TtsSynthesizer] = None, asr_recognizer: Optional[AsrRecognizer] = None, image_generator: Optional[ImageGenerator] = None, video_composer: Optional[VideoComposer] = None):
         self.tts_synthesizer = tts_synthesizer or HttpDoubaoTtsSynthesizer()
         self.asr_recognizer = asr_recognizer or HttpDoubaoAsrRecognizer()
         self.image_generator = image_generator or HttpSeedreamImageGenerator()
+        self.video_composer = video_composer or FfmpegVideoComposer()
 
     def execute(self, repository: ProjectRepository, job_id: int, secrets: SecretStore) -> None:
         job = repository.update_production_job(job_id, status="RUNNING", log="开始生产前检查")
@@ -196,6 +240,23 @@ class PreflightProductionExecutor:
                     repository.update_production_job(job_id, status="RUNNING", stage_name="COVER", stage_status="COMPLETED", progress=100, log=f"品牌封面已保存：{output / 'cover.svg'}")
                 except Exception as error:
                     repository.update_production_job(job_id, status="FAILED", failed_stage="COVER", log=f"封面生成失败：{error}")
+                    return
+            elif stage.name.value == "VIDEO":
+                root = repository.database_path.parent / "projects" / str(job.projectId)
+                images = sorted((root / "storyboard").glob("scene-*.png"))
+                audio_path = root / "audio" / "voice.mp3"
+                subtitles_path = root / "subtitles" / "captions.srt"
+                missing = [name for name, exists in (("分镜图片", bool(images)), ("配音文件", audio_path.exists()), ("字幕文件", subtitles_path.exists())) if not exists]
+                if missing:
+                    repository.update_production_job(job_id, status="FAILED", failed_stage="VIDEO", log=f"成片合成失败：缺少{'、'.join(missing)}")
+                    return
+                repository.update_production_job(job_id, status="RUNNING", stage_name="VIDEO", stage_status="RUNNING", progress=10, log="正在使用 FFmpeg 合成成片")
+                try:
+                    output = root / "video" / "final.mp4"
+                    self.video_composer.compose(images=images, audio_path=audio_path, subtitles_path=subtitles_path, output_path=output, voice_volume=settings.voiceVolume, bgm_volume=settings.bgmVolume)
+                    repository.update_production_job(job_id, status="RUNNING", stage_name="VIDEO", stage_status="COMPLETED", progress=100, log=f"成片已保存：{output}")
+                except Exception as error:
+                    repository.update_production_job(job_id, status="FAILED", failed_stage="VIDEO", log=f"成片合成失败：{error}")
                     return
             elif stage.name.value != "VIDEO":
                 repository.update_production_job(job_id, status="QUEUED", log=f"{stage.name.value} 等待媒体执行器")

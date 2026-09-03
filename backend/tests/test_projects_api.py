@@ -31,6 +31,16 @@ class FakeImageGenerator:
         return f"image:{prompt}".encode()
 
 
+class FakeVideoComposer:
+    def compose(self, *, images, audio_path, subtitles_path, output_path, voice_volume, bgm_volume):
+        assert len(images) == 2
+        assert audio_path.name == "voice.mp3"
+        assert subtitles_path.name == "captions.srt"
+        assert voice_volume == 1.3
+        output_path.parent.mkdir(parents=True, exist_ok=True)
+        output_path.write_bytes(b"fake mp4")
+
+
 class FakeSecretStore:
     def __init__(self):
         self.values = {}
@@ -439,3 +449,25 @@ def test_cover_stage_generates_branded_safe_svg(tmp_path):
     assert "成长 &amp; 陪伴" in svg
     assert "镜序工坊" in svg
     assert "viewBox=\"0 0 1920 1080\"" in svg
+
+
+def test_video_stage_composes_existing_assets_to_mp4(tmp_path):
+    executor = PreflightProductionExecutor(video_composer=FakeVideoComposer())
+    with make_client(tmp_path, production_executor=executor) as client:
+        project = client.post("/api/projects", json={"title": "成片任务", "channel": "默认栏目"}).json()
+        client.put(f"/api/projects/{project['id']}/script", json={"content": "测试成片脚本。"})
+        root = tmp_path / "projects" / str(project["id"])
+        (root / "storyboard").mkdir(parents=True)
+        (root / "storyboard" / "scene-001.png").write_bytes(b"one")
+        (root / "storyboard" / "scene-002.png").write_bytes(b"two")
+        (root / "audio").mkdir()
+        (root / "audio" / "voice.mp3").write_bytes(b"audio")
+        (root / "subtitles").mkdir()
+        (root / "subtitles" / "captions.srt").write_text("1\n00:00:00,000 --> 00:00:04,000\n字幕\n")
+        client.put(f"/api/projects/{project['id']}/production-settings", json={"stages": ["VIDEO"]})
+        client.post(f"/api/projects/{project['id']}/production-jobs")
+        loaded = client.get(f"/api/projects/{project['id']}/production-jobs/latest")
+
+    assert loaded.json()["status"] == "COMPLETED"
+    assert loaded.json()["stages"][0] == {"name": "VIDEO", "status": "COMPLETED", "progress": 100}
+    assert (root / "video" / "final.mp4").read_bytes() == b"fake mp4"
