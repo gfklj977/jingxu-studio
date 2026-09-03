@@ -143,6 +143,21 @@ class ProductionSettings(BaseModel):
     bgmVolume: float = Field(default=0.09, ge=0, le=1)
 
 
+class ProductionJobStage(BaseModel):
+    name: ProductionStage
+    status: str = "PENDING"
+    progress: int = 0
+
+
+class ProductionJob(BaseModel):
+    id: int
+    projectId: int
+    status: str
+    stages: List[ProductionJobStage]
+    createdAt: datetime
+    updatedAt: datetime
+
+
 class Pagination(BaseModel):
     page: int
     pageSize: int

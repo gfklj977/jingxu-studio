@@ -1,9 +1,10 @@
 import sqlite3
+import json
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import List, Optional, Tuple
 
-from .schemas import CreateProject, ProductionSettings, Project, ProjectScript, ProjectStatus, SaveScript, ScriptVersion, UpdateProject
+from .schemas import CreateProject, ProductionJob, ProductionJobStage, ProductionSettings, Project, ProjectScript, ProjectStatus, SaveScript, ScriptVersion, UpdateProject
 
 
 class ProjectNotFound(Exception):
@@ -11,6 +12,10 @@ class ProjectNotFound(Exception):
 
 
 class InvalidProjectOrder(Exception):
+    pass
+
+
+class ActiveProductionJob(Exception):
     pass
 
 
@@ -34,6 +39,7 @@ class ProjectRepository:
                 """
             )
             connection.execute("CREATE TABLE IF NOT EXISTS production_settings (project_id INTEGER PRIMARY KEY, payload TEXT NOT NULL, updated_at TEXT NOT NULL, FOREIGN KEY(project_id) REFERENCES projects(id))")
+            connection.execute("CREATE TABLE IF NOT EXISTS production_jobs (id INTEGER PRIMARY KEY AUTOINCREMENT, project_id INTEGER NOT NULL, status TEXT NOT NULL, stages TEXT NOT NULL, created_at TEXT NOT NULL, updated_at TEXT NOT NULL, FOREIGN KEY(project_id) REFERENCES projects(id))")
             columns = {row[1] for row in connection.execute("PRAGMA table_info(projects)")}
             migrations = {
                 "is_pinned": "ALTER TABLE projects ADD COLUMN is_pinned INTEGER NOT NULL DEFAULT 0",
@@ -239,6 +245,40 @@ class ProjectRepository:
         with self._connect() as connection:
             connection.execute("INSERT INTO production_settings (project_id, payload, updated_at) VALUES (?, ?, ?) ON CONFLICT(project_id) DO UPDATE SET payload = excluded.payload, updated_at = excluded.updated_at", (project_id, payload.model_dump_json(), datetime.now(timezone.utc).isoformat()))
         return payload
+
+    def create_production_job(self, project_id: int) -> ProductionJob:
+        settings = self.get_production_settings(project_id)
+        now = datetime.now(timezone.utc).isoformat()
+        stages = [ProductionJobStage(name=stage).model_dump(mode="json") for stage in settings.stages]
+        with self._connect() as connection:
+            active = connection.execute("SELECT id FROM production_jobs WHERE project_id = ? AND status IN ('QUEUED', 'RUNNING')", (project_id,)).fetchone()
+            if active:
+                raise ActiveProductionJob()
+            cursor = connection.execute("INSERT INTO production_jobs (project_id, status, stages, created_at, updated_at) VALUES (?, 'QUEUED', ?, ?, ?)", (project_id, json.dumps(stages), now, now))
+        return self.get_production_job(cursor.lastrowid)
+
+    def get_production_job(self, job_id: int) -> ProductionJob:
+        with self._connect() as connection:
+            row = connection.execute("SELECT * FROM production_jobs WHERE id = ?", (job_id,)).fetchone()
+        if row is None:
+            raise ProjectNotFound()
+        return ProductionJob(id=row["id"], projectId=row["project_id"], status=row["status"], stages=[ProductionJobStage(**item) for item in json.loads(row["stages"])], createdAt=datetime.fromisoformat(row["created_at"]), updatedAt=datetime.fromisoformat(row["updated_at"]))
+
+    def latest_production_job(self, project_id: int) -> ProductionJob:
+        self.get(project_id)
+        with self._connect() as connection:
+            row = connection.execute("SELECT id FROM production_jobs WHERE project_id = ? ORDER BY id DESC LIMIT 1", (project_id,)).fetchone()
+        if row is None:
+            raise ProjectNotFound()
+        return self.get_production_job(row["id"])
+
+    def cancel_production_job(self, job_id: int) -> ProductionJob:
+        now = datetime.now(timezone.utc).isoformat()
+        with self._connect() as connection:
+            cursor = connection.execute("UPDATE production_jobs SET status = 'CANCELLED', updated_at = ? WHERE id = ? AND status IN ('QUEUED', 'RUNNING')", (now, job_id))
+            if cursor.rowcount == 0:
+                raise ProjectNotFound()
+        return self.get_production_job(job_id)
 
     def _connect(self) -> sqlite3.Connection:
         connection = sqlite3.connect(self.database_path)

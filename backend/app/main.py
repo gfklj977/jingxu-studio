@@ -8,9 +8,9 @@ from fastapi import FastAPI, HTTPException, Query, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 
-from .database import InvalidProjectOrder, ProjectNotFound, ProjectRepository
+from .database import ActiveProductionJob, InvalidProjectOrder, ProjectNotFound, ProjectRepository
 from .providers import HttpProviderTester, ProviderTester
-from .schemas import CreateProject, GeneratedScript, GenerateScriptRequest, PaginatedResponse, Pagination, ProductionSettings, Project, ProjectOrder, ProjectScript, ProviderCatalog, ProviderSecret, ProviderStatus, ProviderTestResult, ResearchItem, ResearchRequest, ResearchResult, SaveScript, UpdateProject
+from .schemas import CreateProject, GeneratedScript, GenerateScriptRequest, PaginatedResponse, Pagination, ProductionJob, ProductionSettings, Project, ProjectOrder, ProjectScript, ProviderCatalog, ProviderSecret, ProviderStatus, ProviderTestResult, ResearchItem, ResearchRequest, ResearchResult, SaveScript, UpdateProject
 from .secrets import KeyringSecretStore, SecretStore
 
 
@@ -81,6 +81,10 @@ def create_app(database_path: Path = DEFAULT_DATA_PATH, secret_store: Optional[S
             status_code=409,
             content={"error": {"code": "INVALID_PROJECT_ORDER", "message": "项目顺序与当前列表不一致"}},
         )
+
+    @app.exception_handler(ActiveProductionJob)
+    async def active_production_job(_: Request, __: ActiveProductionJob):
+        return JSONResponse(status_code=409, content={"error": {"code": "ACTIVE_PRODUCTION_JOB", "message": "该项目已有运行中的任务"}})
 
     @app.get("/api/health")
     def health():
@@ -206,6 +210,18 @@ def create_app(database_path: Path = DEFAULT_DATA_PATH, secret_store: Optional[S
     @app.put("/api/projects/{project_id}/production-settings", response_model=ProductionSettings)
     def save_production_settings(project_id: int, payload: ProductionSettings):
         return repository.save_production_settings(project_id, payload)
+
+    @app.post("/api/projects/{project_id}/production-jobs", response_model=ProductionJob, status_code=201)
+    def create_production_job(project_id: int):
+        return repository.create_production_job(project_id)
+
+    @app.get("/api/projects/{project_id}/production-jobs/latest", response_model=ProductionJob)
+    def latest_production_job(project_id: int):
+        return repository.latest_production_job(project_id)
+
+    @app.post("/api/production-jobs/{job_id}/cancel", response_model=ProductionJob)
+    def cancel_production_job(job_id: int):
+        return repository.cancel_production_job(job_id)
 
     return app
 

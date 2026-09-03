@@ -306,3 +306,19 @@ def test_production_settings_have_reference_defaults_and_persist(tmp_path):
     assert defaults.json()["stages"] == ["AUDIO", "SUBTITLES", "STORYBOARD", "COVER", "VIDEO"]
     assert updated.status_code == 200
     assert updated.json()["voiceVolume"] == 1.3
+
+
+def test_create_get_and_cancel_production_job(tmp_path):
+    with make_client(tmp_path) as client:
+        project = client.post("/api/projects", json={"title": "任务队列", "channel": "默认栏目"}).json()
+        created = client.post(f"/api/projects/{project['id']}/production-jobs")
+        duplicate = client.post(f"/api/projects/{project['id']}/production-jobs")
+        cancelled = client.post(f"/api/production-jobs/{created.json()['id']}/cancel")
+        loaded = client.get(f"/api/projects/{project['id']}/production-jobs/latest")
+
+    assert created.status_code == 201
+    assert created.json()["status"] == "QUEUED"
+    assert len(created.json()["stages"]) == 5
+    assert duplicate.status_code == 409
+    assert cancelled.json()["status"] == "CANCELLED"
+    assert loaded.json()["id"] == created.json()["id"]
