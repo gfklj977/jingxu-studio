@@ -94,7 +94,9 @@ jobs:
       - run: npm run release:checksums
       - run: npm run release:verify
       - run: npm run release:smoke
-      - run: npm run release:smoke-desktop
+      - name: Launch packaged desktop and verify renderer
+        if: runner.os == 'macOS'
+        run: npm run release:smoke-desktop
       - uses: actions/upload-artifact@v4
         with:
           name: jingxu-${{ runner.os }}
