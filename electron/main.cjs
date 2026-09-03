@@ -8,9 +8,12 @@ const { spawn } = require('node:child_process')
 const { isAllowedPublishUrl } = require('./security.cjs')
 const { attachDesktopSmokeTest } = require('./smoke.cjs')
 const { terminateBackendProcess } = require('./process-tree.cjs')
+const { configureSingleInstance } = require('./single-instance.cjs')
 
 let backendProcess
 let desktopUrl
+let mainWindow
+const isPrimaryInstance = configureSingleInstance(app, () => mainWindow)
 
 function installApplicationMenu() {
   const checkForUpdates = async () => {
@@ -134,6 +137,8 @@ function createWindow(appUrl) {
       fail: (error) => { console.error('JINGXU_DESKTOP_SMOKE_FAILED', error); app.exit(1) },
     })
   }
+  mainWindow = window
+  window.on('closed', () => { if (mainWindow === window) mainWindow = undefined })
   window.loadURL(appUrl)
   return window
 }
@@ -151,17 +156,19 @@ ipcMain.handle('desktop:showItemInFolder', (_event, filePath) => {
   shell.showItemInFolder(filePath)
 })
 
-app.whenReady()
-  .then(async () => {
-    desktopUrl = process.env.JINGXU_DEV_URL || await startPackagedBackend()
-    installApplicationMenu()
-    createWindow(desktopUrl)
-    startAutomaticUpdates()
-    app.on('activate', () => { if (BrowserWindow.getAllWindows().length === 0) createWindow(desktopUrl) })
-  })
-  .catch((error) => {
-    dialog.showErrorBox('镜序工坊启动失败', error instanceof Error ? error.message : String(error))
-    app.quit()
-  })
+if (isPrimaryInstance) {
+  app.whenReady()
+    .then(async () => {
+      desktopUrl = process.env.JINGXU_DEV_URL || await startPackagedBackend()
+      installApplicationMenu()
+      createWindow(desktopUrl)
+      startAutomaticUpdates()
+      app.on('activate', () => { if (BrowserWindow.getAllWindows().length === 0) createWindow(desktopUrl) })
+    })
+    .catch((error) => {
+      dialog.showErrorBox('镜序工坊启动失败', error instanceof Error ? error.message : String(error))
+      app.quit()
+    })
+}
 app.on('window-all-closed', () => { if (process.platform !== 'darwin') app.quit() })
 app.on('before-quit', () => terminateBackendProcess(backendProcess))
