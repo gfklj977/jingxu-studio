@@ -121,7 +121,11 @@ button { font: inherit; }
 .production-standard { margin: 0 24px; padding: 18px; border-radius: 10px; background: #f8fafc; }
 .production-standard h4 { margin: 0 0 10px; }
 .production-standard p { margin: 10px 0 0; color: #64748b; }
-.pipeline-start { margin: 0 24px; }
+.pipeline-actions { display: flex; gap: 10px; margin: 0 24px; }
+.job-status { display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; margin: 18px 24px; padding: 16px; border: 1px solid #bae6fd; border-radius: 10px; background: #f0f9ff; }
+.job-status > div { grid-column: 1 / -1; display: flex; align-items: center; gap: 10px; }
+.job-status > span { display: grid; gap: 3px; font-weight: 600; }
+.job-status small { color: #64748b; font-weight: 400; }
 @media (max-width: 1100px) { .pipeline-stages { grid-template-columns: repeat(2, 1fr); } }
 .placeholder-view > span { color: #0f766e; font-size: 40px; }
 .placeholder-view h3 { margin: 16px 0 0; color: #0f172a; }

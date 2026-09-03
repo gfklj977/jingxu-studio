@@ -226,12 +226,15 @@ describe('镜序工坊工作台', () => {
     const user = userEvent.setup()
     const settings = { stages: ['AUDIO', 'SUBTITLES', 'STORYBOARD', 'COVER', 'VIDEO'], resolution: '1920x1080', fps: 30, videoCodec: 'H264', audioCodec: 'AAC', voiceVolume: 1.3, bgmVolume: 0.09 }
     const fetchMock = vi.mocked(fetch)
-    fetchMock.mockResolvedValueOnce({ ok: true, json: async () => ({ data: [], pagination: {} }) } as Response).mockResolvedValueOnce({ ok: true, json: async () => settings } as Response).mockResolvedValueOnce({ ok: true, json: async () => settings } as Response)
+    fetchMock.mockResolvedValueOnce({ ok: true, json: async () => ({ data: [], pagination: {} }) } as Response).mockResolvedValueOnce({ ok: true, json: async () => settings } as Response).mockResolvedValueOnce({ ok: false, status: 404 } as Response).mockResolvedValueOnce({ ok: true, json: async () => settings } as Response).mockResolvedValueOnce({ ok: true, json: async () => ({ id: 7, projectId: 181, status: 'QUEUED', stages: settings.stages.map((name) => ({ name, status: 'PENDING', progress: 0 })), createdAt: '', updatedAt: '' }) } as Response)
     render(<App />)
 
     await user.click(screen.getByRole('tab', { name: '生产' }))
     expect(await screen.findByText('1920×1080')).toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: /保存生产设置/ }))
     expect(fetchMock).toHaveBeenLastCalledWith('/api/projects/181/production-settings', expect.objectContaining({ method: 'PUT' }))
+    await user.click(screen.getByRole('button', { name: /一键生成/ }))
+    expect(await screen.findByText('任务 #7')).toBeInTheDocument()
+    expect(screen.getByText('排队中')).toBeInTheDocument()
   })
 })

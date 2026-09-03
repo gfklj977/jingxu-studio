@@ -168,3 +168,8 @@ export async function saveProductionSettings(projectId: number, settings: Produc
   if (!response.ok) throw new Error('生产设置保存失败')
   return response.json() as Promise<ProductionSettings>
 }
+
+export interface ProductionJob { id: number; projectId: number; status: 'QUEUED' | 'RUNNING' | 'COMPLETED' | 'FAILED' | 'CANCELLED'; stages: { name: ProductionStage; status: string; progress: number }[]; createdAt: string; updatedAt: string }
+export async function createProductionJob(projectId: number): Promise<ProductionJob> { const response = await fetch(`/api/projects/${projectId}/production-jobs`, { method: 'POST' }); if (!response.ok) throw new Error('任务启动失败'); return response.json() as Promise<ProductionJob> }
+export async function getLatestProductionJob(projectId: number): Promise<ProductionJob | null> { const response = await fetch(`/api/projects/${projectId}/production-jobs/latest`); if (response.status === 404) return null; if (!response.ok) throw new Error('任务加载失败'); return response.json() as Promise<ProductionJob> }
+export async function cancelProductionJob(jobId: number): Promise<ProductionJob> { const response = await fetch(`/api/production-jobs/${jobId}/cancel`, { method: 'POST' }); if (!response.ok) throw new Error('任务取消失败'); return response.json() as Promise<ProductionJob> }
