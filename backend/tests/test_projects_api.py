@@ -4,6 +4,15 @@ from app.main import create_app
 from app.production import NoopProductionExecutor, PreflightProductionExecutor
 
 
+class FakeTtsSynthesizer:
+    def synthesize(self, *, app_id, access_token, voice_type, text):
+        assert app_id == "test-app"
+        assert access_token == "test-token"
+        assert voice_type == "test-voice"
+        assert text == "这是一段测试脚本"
+        return b"fake mp3"
+
+
 class FakeSecretStore:
     def __init__(self):
         self.values = {}
@@ -335,3 +344,20 @@ def test_production_preflight_fails_with_actionable_log_when_script_is_empty(tmp
     assert loaded.json()["status"] == "FAILED"
     assert loaded.json()["stages"][0]["status"] == "FAILED"
     assert loaded.json()["logs"] == ["开始生产前检查", "前置检查失败：请先完成并保存脚本"]
+
+
+def test_audio_stage_generates_file_and_completes_before_next_stage(tmp_path):
+    secret_store = FakeSecretStore()
+    secret_store.set("doubao_tts", "test-token")
+    executor = PreflightProductionExecutor(tts_synthesizer=FakeTtsSynthesizer())
+    with make_client(tmp_path, secret_store=secret_store, production_executor=executor) as client:
+        project = client.post("/api/projects", json={"title": "配音任务", "channel": "默认栏目"}).json()
+        client.put(f"/api/projects/{project['id']}/script", json={"content": "这是一段测试脚本"})
+        client.put(f"/api/projects/{project['id']}/production-settings", json={"stages": ["AUDIO"], "ttsAppId": "test-app", "ttsVoiceType": "test-voice"})
+        client.post(f"/api/projects/{project['id']}/production-jobs")
+        loaded = client.get(f"/api/projects/{project['id']}/production-jobs/latest")
+
+    assert loaded.json()["status"] == "COMPLETED"
+    assert loaded.json()["stages"][0] == {"name": "AUDIO", "status": "COMPLETED", "progress": 100}
+    audio_path = tmp_path / "projects" / str(project["id"]) / "audio" / "voice.mp3"
+    assert audio_path.read_bytes() == b"fake mp3"

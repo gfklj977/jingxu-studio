@@ -141,6 +141,8 @@ class ProductionSettings(BaseModel):
     audioCodec: str = Field(default="AAC", pattern="^AAC$")
     voiceVolume: float = Field(default=1.3, ge=0, le=2)
     bgmVolume: float = Field(default=0.09, ge=0, le=1)
+    ttsAppId: str = ""
+    ttsVoiceType: str = "zh_male_M392_conversation_wvae_bigtts"
 
 
 class ProductionJobStage(BaseModel):

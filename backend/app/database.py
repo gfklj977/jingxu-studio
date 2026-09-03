@@ -267,13 +267,16 @@ class ProjectRepository:
             raise ProjectNotFound()
         return ProductionJob(id=row["id"], projectId=row["project_id"], status=row["status"], stages=[ProductionJobStage(**item) for item in json.loads(row["stages"])], logs=json.loads(row["logs"]), createdAt=datetime.fromisoformat(row["created_at"]), updatedAt=datetime.fromisoformat(row["updated_at"]))
 
-    def update_production_job(self, job_id: int, *, status: str, log: str, failed_stage: Optional[str] = None) -> ProductionJob:
+    def update_production_job(self, job_id: int, *, status: str, log: str, stage_name: Optional[str] = None, stage_status: Optional[str] = None, progress: Optional[int] = None, failed_stage: Optional[str] = None) -> ProductionJob:
         job = self.get_production_job(job_id)
         stages = [stage.model_dump(mode="json") for stage in job.stages]
-        if failed_stage:
+        target_stage = failed_stage or stage_name
+        if target_stage:
             for stage in stages:
-                if stage["name"] == failed_stage:
-                    stage["status"] = "FAILED"
+                if stage["name"] == target_stage:
+                    stage["status"] = "FAILED" if failed_stage else stage_status or stage["status"]
+                    if progress is not None:
+                        stage["progress"] = progress
         logs = [*job.logs, log]
         now = datetime.now(timezone.utc).isoformat()
         with self._connect() as connection:
