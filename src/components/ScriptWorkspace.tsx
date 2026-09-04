@@ -1,4 +1,4 @@
-import { BulbOutlined, ClockCircleOutlined, FileSearchOutlined, SaveOutlined } from '@ant-design/icons'
+import { BulbOutlined, ClockCircleOutlined, FileSearchOutlined, SaveOutlined, UploadOutlined } from '@ant-design/icons'
 import { Alert, Button, Input, Skeleton, message } from 'antd'
 import { useEffect, useState } from 'react'
 import { generateProjectScript, getProjectScript, researchProject, saveProjectScript, type ProjectScript } from '../api/projects'
@@ -12,6 +12,7 @@ export function ScriptWorkspace({ projectId }: { projectId: number }) {
   const [error, setError] = useState('')
   const [searching, setSearching] = useState(false)
   const [generating, setGenerating] = useState(false)
+  const [importedFile, setImportedFile] = useState('')
 
   useEffect(() => {
     let active = true
@@ -24,6 +25,26 @@ export function ScriptWorkspace({ projectId }: { projectId: number }) {
 
   function update(field: keyof ProjectScript, value: string) {
     setScript((current) => ({ ...current, [field]: value }))
+  }
+
+  async function importScript(file: File) {
+    if (!/\.(txt|md)$/i.test(file.name)) {
+      setError('仅支持上传 .txt 或 .md 脚本文件。')
+      return
+    }
+    if (file.size > 1024 * 1024) {
+      setError('脚本文件不能超过 1 MB。')
+      return
+    }
+    setError('')
+    const content = await new Promise<string>((resolve, reject) => {
+      const reader = new FileReader()
+      reader.onload = () => resolve(String(reader.result ?? ''))
+      reader.onerror = () => reject(reader.error)
+      reader.readAsText(file, 'UTF-8')
+    })
+    update('content', content)
+    setImportedFile(file.name)
   }
 
   async function save() {
@@ -71,6 +92,14 @@ export function ScriptWorkspace({ projectId }: { projectId: number }) {
         <label><span>选题 <small>{script.topic.length}/200</small></span><Input aria-label="选题" maxLength={200} value={script.topic} onChange={(event) => update('topic', event.target.value)} placeholder="例如：AI 时代，摄影师该如何重新出发？" /></label>
         <label><span>创作简报 <small>{script.brief.length}/4000</small></span><Input.TextArea aria-label="创作简报" maxLength={4000} rows={3} value={script.brief} onChange={(event) => update('brief', event.target.value)} placeholder="目标观众、核心观点、时长、口吻和行动号召" /></label>
         <label><span>资料摘要 <small>{script.researchNotes.length}/20000</small></span><Input.TextArea aria-label="资料摘要" maxLength={20000} rows={5} value={script.researchNotes} onChange={(event) => update('researchNotes', event.target.value)} placeholder="粘贴来源、关键事实和可引用观点" /></label>
+        <div className="script-source-bar">
+          <div><strong>脚本来源</strong><small>可使用 AI 生成，也可以直接导入自己的文稿</small></div>
+          <label className="script-upload">
+            <input aria-label="上传脚本文件" type="file" accept=".txt,.md,text/plain,text/markdown" onChange={(event) => { const file = event.target.files?.[0]; if (file) void importScript(file) }} />
+            <span><UploadOutlined /> 上传 TXT / MD</span>
+          </label>
+          {importedFile && <span className="import-success">已导入 {importedFile}</span>}
+        </div>
         <div className="script-tools">
           <Button icon={<FileSearchOutlined />} loading={searching} disabled={script.topic.trim().length < 2} onClick={research}>联网搜索</Button>
           <Button icon={<BulbOutlined />} loading={generating} disabled={!script.topic.trim()} onClick={generate}>AI 生成脚本</Button>

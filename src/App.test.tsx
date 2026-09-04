@@ -166,6 +166,22 @@ describe('镜序工坊工作台', () => {
     expect(await screen.findByText('版本 1')).toBeInTheDocument()
   })
 
+  it('允许上传 txt 或 md 文件作为脚本正文', async () => {
+    const user = userEvent.setup()
+    const fetchMock = vi.mocked(fetch)
+    fetchMock
+      .mockResolvedValueOnce({ ok: true, json: async () => ({ data: [], pagination: {} }) } as Response)
+      .mockResolvedValueOnce({ ok: true, json: async () => ({ projectId: 181, topic: '', brief: '', researchNotes: '', content: '', updatedAt: '', versions: [] }) } as Response)
+    render(<App />)
+
+    await user.click(screen.getByRole('tab', { name: '脚本' }))
+    const input = await screen.findByLabelText('上传脚本文件')
+    await user.upload(input, new File(['这是手动上传的脚本正文'], 'script.md', { type: 'text/markdown' }))
+
+    expect(await screen.findByDisplayValue('这是手动上传的脚本正文')).toBeInTheDocument()
+    expect(screen.getByText('已导入 script.md')).toBeInTheDocument()
+  })
+
   it('在设置中展示服务配置状态', async () => {
     const user = userEvent.setup()
     const fetchMock = vi.mocked(fetch)
@@ -178,6 +194,9 @@ describe('镜序工坊工作台', () => {
 
     expect(await screen.findByText('DeepSeek')).toBeInTheDocument()
     expect(screen.getByText('未配置')).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: '文本生成' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: '联网搜索' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: '图像生成' })).toBeInTheDocument()
   })
 
   it('保存服务密钥后刷新状态', async () => {
